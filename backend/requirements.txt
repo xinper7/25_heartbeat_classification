@@ -1,0 +1,17 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+fastapi==0.162.1
+uvicorn==0.54.0
+SQLAlchemy==2.1.8
+PyMySQL==1.2.3
+alembic==1.20.1
+pydantic==2.13.4
+pydantic-settings==2.16.2
+python-multipart==0.0.33
+PyJWT==2.15.1
+argon2-cffi==25.1.0
+cryptography==50.0.1
+numpy==2.5.2
+scipy==1.18.1
+pillow==12.3.0
+onnxruntime==1.31.1
+torch==2.13.0+cpu

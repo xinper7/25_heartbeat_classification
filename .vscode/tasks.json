@@ -1,0 +1,14 @@
+{
+  "version":"2.0.0",
+  "tasks":[
+    {"label":"调试前准备 API","type":"process","command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","${workspaceFolder}/scripts/prepare_debug.ps1","-Target","api"],"options":{"cwd":"${workspaceFolder}"},"problemMatcher":[],"presentation":{"reveal":"silent","panel":"shared"}},
+    {"label":"调试前准备 Worker","type":"process","command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","${workspaceFolder}/scripts/prepare_debug.ps1","-Target","worker"],"options":{"cwd":"${workspaceFolder}"},"problemMatcher":[],"presentation":{"reveal":"silent","panel":"shared"}},
+    {"label":"调试前准备后端和 Worker","type":"process","command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","${workspaceFolder}/scripts/prepare_debug.ps1","-Target","both"],"options":{"cwd":"${workspaceFolder}"},"problemMatcher":[],"presentation":{"reveal":"silent","panel":"shared"}},
+    {"label":"安装项目依赖","type":"shell","command":"powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup.ps1 -DevDependencies","problemMatcher":[]},
+    {"label":"启动开发环境","type":"shell","command":"powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start.ps1 -Dev","problemMatcher":[]},
+    {"label":"启动完整构建版","type":"shell","command":"powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start.ps1 -Build","problemMatcher":[]},
+    {"label":"停止项目服务","type":"shell","command":"powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stop.ps1","problemMatcher":[]},
+    {"label":"前端热更新","type":"shell","command":"npm.cmd run dev","options":{"cwd":"${workspaceFolder}/frontend"},"problemMatcher":[]},
+    {"label":"后端测试","type":"shell","command":".venv/Scripts/python.exe -m pytest backend/tests -q","problemMatcher":[]}
+  ]
+}

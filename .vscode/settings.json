@@ -1,0 +1,16 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestArgs": ["backend/tests"],
+  "python.analysis.extraPaths": ["backend"],
+  "files.exclude": {"**/__pycache__":true},
+  "search.exclude": {
+    "runtime": true,
+    ".venv": true,
+    "frontend/node_modules": true,
+    "frontend/dist": true
+  },
+  "files.readonlyInclude": {
+    "{**/.c4z/.extsrcs/*.PROTSYM.cbl,**/.c4z/.extsrcs/*.PROTSYM.listing}": true
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "version":"0.2.0",
+  "configurations":[
+    {"name":"FastAPI 后端","type":"debugpy","request":"launch","program":"${workspaceFolder}/scripts/run_api.py","console":"integratedTerminal","cwd":"${workspaceFolder}","justMyCode":true,"preLaunchTask":"调试前准备 API"},
+    {"name":"批量任务 Worker","type":"debugpy","request":"launch","program":"${workspaceFolder}/scripts/run_worker.py","console":"integratedTerminal","cwd":"${workspaceFolder}","justMyCode":true,"preLaunchTask":"调试前准备 Worker"}
+  ],
+  "compounds":[{"name":"后端 + Worker","configurations":["FastAPI 后端","批量任务 Worker"],"preLaunchTask":"调试前准备后端和 Worker","stopAll":true}]
+}
