@@ -74,7 +74,12 @@ def run_once():
                     db.get(Study, study_id).status = "queued"
                 else:
                     item.status = "failed"
-                    item.error = "分析失败，请检查服务日志、模型状态和输入后重试。"
+                    item.error = (
+                        str(exc.detail)[:300] if isinstance(exc,HTTPException) and 400<=exc.status_code<500
+                        else "输入文件缺失，请恢复原始上传文件后仅重试失败项。" if isinstance(exc,FileNotFoundError)
+                        else "输入文件无法读取，请检查文件权限和文件完整性后重试。" if isinstance(exc,OSError)
+                        else "模型执行失败，请检查模型运行状态及服务日志后重试。"
+                    )
                     db.get(Study, study_id).status = "failed"
                 item.lease_until = None
                 db.commit()

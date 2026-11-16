@@ -1,0 +1,8 @@
+-r requirements.txt
+langchain==1.5.0
+langchain-core==1.8.1
+transformers==4.57.6
+peft==0.21.3
+accelerate==1.15.0
+huggingface-hub==0.36.2
+sentencepiece==0.2.3

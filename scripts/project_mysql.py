@@ -8,6 +8,8 @@ import socket
 import subprocess
 import sys
 import time
+import tempfile
+import hashlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,6 +17,16 @@ RUNTIME = ROOT / "runtime"
 DATA = RUNTIME / "mysql"
 PORT = 3307
 
+
+def mysql_path(path):
+    """MySQL Windows argv parsing cannot reliably handle non-ASCII installation paths."""
+    path=Path(path).absolute()
+    if os.name!='nt' or str(path).isascii():return path
+    alias=Path(tempfile.gettempdir())/('cardio-mysql-'+hashlib.sha256(str(ROOT).encode()).hexdigest()[:10])
+    if not alias.exists():
+        subprocess.run(['powershell','-NoProfile','-Command',"New-Item -ItemType Junction -Path '"+str(alias).replace("'","''")+"' -Target '"+str(ROOT).replace("'","''")+"' | Out-Null"],check=True,creationflags=subprocess.CREATE_NO_WINDOW)
+    if alias.resolve()!=ROOT.resolve():raise RuntimeError('Unexpected MySQL path alias')
+    return alias/path.relative_to(ROOT)
 
 def is_listening():
     try:
@@ -28,7 +40,7 @@ def start(binary):
     import pymysql
 
     RUNTIME.mkdir(exist_ok=True)
-    binary = Path(binary).resolve()
+    binary = mysql_path(Path(binary).resolve())
     if not binary.is_file():
         raise RuntimeError(
             "请指定已安装的MySQL 8 mysqld.exe路径，或使用自己已启动的MySQL服务。"
@@ -47,7 +59,7 @@ def start(binary):
                 "--no-defaults",
                 "--initialize-insecure",
                 f"--basedir={binary.parent.parent}",
-                f"--datadir={DATA}",
+                f"--datadir={mysql_path(DATA)}",
                 "--console",
             ],
             stdout=subprocess.PIPE,
@@ -61,13 +73,13 @@ def start(binary):
             str(binary),
             "--no-defaults",
             f"--basedir={binary.parent.parent}",
-            f"--datadir={DATA}",
+            f"--datadir={mysql_path(DATA)}",
             "--bind-address=127.0.0.1",
             f"--port={PORT}",
             "--mysqlx=0",
             "--innodb-buffer-pool-size=134217728",
-            f"--pid-file={RUNTIME / 'mysql.pid'}",
-            f"--log-error={RUNTIME / 'mysql-error.log'}",
+            f"--pid-file={mysql_path(RUNTIME / 'mysql.pid')}",
+            f"--log-error={mysql_path(RUNTIME / 'mysql-error.log')}",
             "--character-set-server=utf8mb4",
             "--collation-server=utf8mb4_unicode_ci",
         ]
@@ -80,7 +92,7 @@ def start(binary):
                 creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
             )
         (RUNTIME / "mysql-process.json").write_text(
-            json.dumps(dict(pid=process.pid, port=PORT, binary=str(binary))),
+            json.dumps(dict(pid=process.pid, port=PORT, binary=str(binary.resolve()))),
             encoding="utf-8",
         )
         for _ in range(80):
@@ -133,7 +145,7 @@ def start(binary):
         (RUNTIME / "mysql-process.json").write_text(
             json.dumps(
                 dict(
-                    pid=int(pid_path.read_text().strip()), port=PORT, binary=str(binary)
+                    pid=int(pid_path.read_text().strip()), port=PORT, binary=str(binary.resolve())
                 )
             ),
             encoding="utf-8",

@@ -5,6 +5,7 @@ export const router = createRouter({
   routes: [
     ...[
       "dashboard",
+      "agent",
       "patients",
       "signal",
       "image",

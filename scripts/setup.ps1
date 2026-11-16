@@ -16,6 +16,8 @@ $projectPython = Join-Path $projectRoot '.venv\Scripts\python.exe'
 $requirements = if ($DevDependencies) { 'backend\requirements-dev.lock.txt' } else { 'backend\requirements.lock.txt' }
 & $projectPython -m pip install -r $requirements
 if ($LASTEXITCODE -ne 0) { throw 'Python dependencies installation failed.' }
+& $projectPython -m pip install -r backend\requirements-agent.txt
+if ($LASTEXITCODE -ne 0) { throw 'Agent dependencies installation failed.' }
 & $projectPython scripts\local_secrets.py
 if ($LASTEXITCODE -ne 0) { throw 'Could not initialize the local .env file.' }
 Push-Location frontend

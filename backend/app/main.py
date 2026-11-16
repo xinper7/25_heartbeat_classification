@@ -347,6 +347,7 @@ def studies(
     q: str = "",
     kind: str = "",
     status: str = "",
+    source: str = "",
     patient_id: int | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
@@ -369,6 +370,9 @@ def studies(
         query = query.where(Study.kind == kind)
     if status:
         query = query.where(Study.status == status)
+    sample_purpose=Study.metadata_json["source"]["purpose"].as_string()
+    if source=="sample":query=query.where(sample_purpose=="public_sample")
+    elif source=="regular":query=query.where(or_(sample_purpose.is_(None),sample_purpose!="public_sample"))
     if patient_id:
         access_patient(db, patient_id, user)
         query = query.where(Study.patient_id == patient_id)
@@ -490,7 +494,8 @@ def upload_assets(
     if image is not None:
         image.thumbnail((1800, 1800))
         image.save(folder / "preview.png")
-    study.metadata_json = meta | {"storage_key": key, "files": list(contents)}
+    detected_source=sample_names.source_for_hashes(hashlib.sha256(data).hexdigest() for data in contents.values())
+    study.metadata_json = meta | {"storage_key": key, "files": list(contents)} | ({"source":detected_source} if detected_source else {})
     study.status = "ready"
     audit(db, user, "assets.uploaded", "study:" + str(study.id))
     db.commit()
@@ -693,9 +698,16 @@ def models(user: Actor):
 
 
 @app.get("/api/v1/audit", tags=["admin"], response_model=ApiResponse)
-def audit_logs(db: DB, user: Admin, page: int = 1):
+def audit_logs(db: DB, user: Admin, page: int = 1, q: str = ""):
+    query = select(Audit)
+    if q.strip():
+        term = q.strip()[:100]
+        conditions = [Audit.action.contains(term, autoescape=True), Audit.target.contains(term, autoescape=True)]
+        if term.isdigit(): conditions.append(Audit.actor_id == int(term))
+        query = query.where(or_(*conditions))
+    total = db.scalar(select(func.count()).select_from(query.subquery()))
     rows = db.scalars(
-        select(Audit)
+        query
         .order_by(Audit.id.desc())
         .offset((max(1, page) - 1) * 50)
         .limit(50)
@@ -712,7 +724,7 @@ def audit_logs(db: DB, user: Admin, page: int = 1):
                 )
                 for a in rows
             ],
-            total=db.scalar(select(func.count(Audit.id))),
+            total=total,
         )
     )
 
@@ -798,6 +810,36 @@ def import_samples(db: DB, user: Analyst):
     db.commit()
     return ok(dict(study_ids=ids), "已导入演示样本；分析结果需要实际运行模型生成。")
 
+
+@app.get("/api/v1/samples/catalog", tags=["samples"])
+def sample_catalog(user: Actor):
+    rows=json.loads((ROOT/"sample-data/manifest.json").read_text(encoding="utf-8"))
+    return ok([dict(id=x["ecg_id"], label=f"PTB-XL #{x['ecg_id']}", files=sorted(p.name for p in (ROOT/"sample-data"/x["directory"]).iterdir() if p.suffix in (".csv",".dat",".hea",".png"))) for x in rows])
+
+@app.get("/api/v1/samples/{sample_id}/files/{filename}", tags=["samples"])
+def sample_file(sample_id:int, filename:str, user:Actor):
+    rows=json.loads((ROOT/"sample-data/manifest.json").read_text(encoding="utf-8"))
+    row=next((x for x in rows if x["ecg_id"]==sample_id),None)
+    if not row or filename!=Path(filename).name: raise HTTPException(404,"样例不存在")
+    folder=ROOT/"sample-data"/row["directory"]
+    allowed={p.name for p in folder.iterdir() if p.suffix in (".csv",".dat",".hea",".png")}
+    if filename not in allowed: raise HTTPException(404,"样例不存在")
+    return FileResponse(folder/filename,filename=filename)
+
+@app.get("/api/v1/input-template.csv", tags=["samples"])
+def csv_template(user:Actor):
+    header="time_s,"+",".join(LEADS)+"\n"
+    rows="".join(f"{i/100:.2f},"+",".join([""]*12)+"\n" for i in range(1000))
+    return Response(("\ufeff"+header+rows).encode("utf-8"),media_type="text/csv",headers={"Content-Disposition":"attachment; filename=ecg-template.csv"})
+
+@app.get("/api/v1/studies/{study_id}/review-neighbors",tags=["reviews"])
+def review_neighbors(study_id:int, db:DB, user:Reviewer):
+    access_study(db,study_id,user)
+    ids=list(db.scalars(select(Study.id).where(Study.status=="awaiting_review").order_by(Study.id)))
+    return ok(dict(previous=max((i for i in ids if i<study_id),default=None),next=min((i for i in ids if i>study_id),default=None),remaining=len(ids),position=ids.index(study_id)+1 if study_id in ids else None))
+
+from .agent_lab import router as agent_router
+app.include_router(agent_router)
 
 # Built frontend can be served by the same local API process; dev mode uses Vite proxy.
 dist = ROOT / "frontend" / "dist"

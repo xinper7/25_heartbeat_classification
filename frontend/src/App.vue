@@ -26,7 +26,8 @@
         <span class="eyebrow">欢迎回来</span>
         <h2>登录工作空间</h2>
         <p class="muted">使用分配给你的专业人员账号继续。</p>
-        <el-form @submit.prevent="login" label-position="top"
+        <el-alert v-if="capsLock" title="大写锁定已开启，请检查密码大小写" type="warning" :closable="false" />
+          <el-form @submit.prevent="login" label-position="top"
           ><el-form-item label="账号"
             ><el-input
               v-model="loginForm.username"
@@ -42,7 +43,8 @@
               show-password
               size="large"
               autocomplete="current-password"
-              data-testid="login-password" /></el-form-item
+              @keydown="capsLock = $event.getModifierState('CapsLock')"
+                data-testid="login-password" /></el-form-item
           ><el-button
             native-type="submit"
             type="primary"
@@ -59,7 +61,7 @@
     <div v-if="mobileNav" class="nav-mask" @click="mobileNav = false"></div>
     <aside class="sidebar" :class="{ 'mobile-open': mobileNav }">
       <a class="brand" href="/dashboard" @click.prevent="go('dashboard')"
-        ><span class="brand-title">心电分析系统</span></a
+        ><span class="brand-symbol" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M3 17h6l3-9 6 17 4-12 2 4h5" /></svg></span><span class="brand-copy"><span class="brand-title">心电分析系统</span><small>CARDIO WORKSPACE</small></span></a
       >
       <nav>
         <button
@@ -120,133 +122,17 @@
         </div>
       </header>
       <main class="content" :class="'page-' + page" v-loading="loading">
-        <template v-if="page === 'dashboard'">
-          <div class="page-heading">
-            <div>
-              <div class="eyebrow">OVERVIEW</div>
-              <h1>工作概览<span class="heading-dot">.</span></h1>
-            </div>
-            <el-button
-              v-if="canAnalyze"
-              type="primary"
-              @click="studyDialog = true"
-              ><el-icon><Plus /></el-icon> 新建检查</el-button
-            >
-          </div>
-          <div class="stats-grid">
-            <div
-              v-for="stat in stats"
-              :key="stat.label"
-              class="stat-card"
-              :class="'surface-' + stat.tone"
-            >
-              <div class="stat-top">
-                <span>{{ stat.label }}</span
-                ><el-icon :class="stat.color"
-                  ><component :is="stat.icon"
-                /></el-icon>
-              </div>
-              <strong>{{ stat.value }}</strong
-              ><small>{{ stat.note }}</small>
-            </div>
-          </div>
-          <div class="section-heading">
-            <h2>选择分析入口</h2>
-            <span>按实际持有的数据类型开始</span>
-          </div>
-          <div class="entry-grid">
-            <button class="entry-card signal-entry" @click="go('signal')">
-              <div class="entry-icon">
-                <el-icon><SignalIcon /></el-icon>
-              </div>
-              <div class="entry-tag">数字信号</div>
-              <h2>12导联心电信号分析</h2>
-              <p>
-                读取数字波形，查看导联与时间细节，<br />完成五类诊断超类的多标签分析。
-              </p>
-              <div class="entry-foot">
-                <span>WFDB / CSV</span><el-icon><ArrowRight /></el-icon>
-              </div>
-              <svg class="entry-wave" viewBox="0 0 200 80">
-                <path
-                  d="M0 45 H55 L65 35 L78 45 H95 L105 52 L117 5 L130 76 L143 45 H200"
-                />
-              </svg></button
-            ><button class="entry-card image-entry" @click="go('image')">
-              <div class="entry-icon blue">
-                <el-icon><ReportIcon /></el-icon>
-              </div>
-              <div class="entry-tag">标准报告图</div>
-              <h2>心电报告图分析</h2>
-              <p>
-                从既定标准布局的报告图直接分析，<br />保留完整图片与每一类预测依据。
-              </p>
-              <div class="entry-foot">
-                <span>PNG / JPEG</span><el-icon><ArrowRight /></el-icon>
-              </div>
-              <div class="mini-report"><i v-for="n in 8" :key="n">⌁⌁⌁</i></div>
-            </button>
-          </div>
-          <section class="panel">
-            <div class="panel-heading">
-              <div>
-                <h2>近期检查</h2>
-                <p>继续处理尚未完成的检查记录</p>
-              </div>
-              <el-button text @click="go('studies')"
-                >查看全部 <el-icon><ArrowRight /></el-icon
-              ></el-button>
-            </div>
-            <el-table
-              :data="dashboard.recent || []"
-              @row-click="(row: any) => openStudy(row.id)"
-              class="clickable record-table"
-              stripe
-              ><el-table-column label="检查" min-width="230"
-                ><template #default="{ row }"
-                  ><strong class="table-title">{{ row.title }}</strong
-                  ><small class="table-sub"
-                    >ECG-{{ pad(row.id) }}</small
-                  ></template
-                ></el-table-column
-              ><el-table-column
-                prop="patient_name"
-                label="受检者"
-                min-width="100"
-              /><el-table-column label="输入方式" width="130"
-                ><template #default="{ row }">{{
-                  kindName(row.kind)
-                }}</template></el-table-column
-              ><el-table-column label="状态" width="135"
-                ><template #default="{ row }"
-                  ><span :class="'status ' + row.status">{{
-                    statusNames[row.status]
-                  }}</span></template
-                ></el-table-column
-              ><el-table-column label="时间" width="145"
-                ><template #default="{ row }">{{
-                  date(row.created_at)
-                }}</template></el-table-column
-              ><template #empty
-                ><div class="empty-block">
-                  <el-icon><DocumentAdd /></el-icon>
-                  <h3>从第一条检查开始</h3>
-                  <p>建立受检者档案，或导入项目自带的演示样本。</p>
-                  <el-button
-                    v-if="canAnalyze"
-                    @click="importSamples"
-                    :loading="busy"
-                    >导入演示样本</el-button
-                  >
-                </div></template
-              ></el-table
-            >
-          </section>
-          <div class="bottom-note">
-            <el-icon><InfoFilled /></el-icon>
-            模型预测作为辅助分析信息，专业复核意见独立记录。
-          </div>
-        </template>
+        <DashboardOverview
+          v-if="page === 'dashboard'"
+          :dashboard="dashboard"
+          :can-analyze="canAnalyze"
+          :can-review="canReview"
+          :busy="busy"
+          @new-study="studyDialog = true"
+          @import-samples="importSamples"
+          @navigate="go"
+          @open-study="openStudy"
+        />
 
         <template v-else-if="page === 'patients'">
           <div class="page-heading">
@@ -298,8 +184,8 @@
                   ><el-button
                     text
                     type="primary"
-                    @click="viewPatientStudies(row)"
-                    >检查记录</el-button
+                    @click="viewPatient(row)"
+                    >档案详情</el-button
                   ><el-button
                     class="action-edit"
                     v-if="canAnalyze"
@@ -415,7 +301,8 @@
                       label="原始波形：由系统进行40 Hz低通"
                       value="raw_mv" /></el-select
                 ></el-form-item>
-                <div v-if="page === 'signal'" class="two-fields">
+                <UploadGuide :kind="page" :files="selectedFiles" @sample="files => { selectedFiles=files;inputProfile='filtered_mv'; }" />
+                <div v-if="page === 'signal' && (!selectedFiles.length || selectedFiles.some(f => f.name.toLowerCase().endsWith('.csv')))" class="two-fields">
                   <el-form-item label="CSV采样率"
                     ><el-input-number
                       v-model="samplingRate"
@@ -592,7 +479,7 @@
                   </div>
                   <div class="prediction-list">
                     <div
-                      v-for="p in latestAnalysis.predictions"
+                      v-for="p in sortedPredictions(latestAnalysis.predictions)"
                       :key="p.code"
                       class="prediction"
                     >
@@ -620,7 +507,7 @@
                     </div>
                   </div>
                   <div class="result-caption">
-                    五类独立预测，可同时出现多个阳性标签。竖线表示验证集固定阈值。
+                    五类独立预测，可同时出现多个阳性标签。数值为模型分数，不代表患病概率；竖线为固定分类阈值。
                   </div>
                   <div class="result-actions">
                     <el-button
@@ -690,15 +577,15 @@
                 v-model="search"
                 placeholder="搜索检查、姓名、档案编号"
                 clearable
-                @keyup.enter="loadStudies"
-                @clear="loadStudies"
+                @keyup.enter="listPage=1;loadStudies()"
+                @clear="listPage=1;loadStudies()"
                 ><template #prefix
                   ><el-icon><Search /></el-icon></template></el-input
               ><el-select
                 v-model="filterKind"
                 placeholder="全部输入"
                 clearable
-                @change="loadStudies"
+                @change="listPage=1;loadStudies()"
                 ><el-option label="数字信号" value="signal" /><el-option
                   label="标准报告图"
                   value="image" /></el-select
@@ -707,21 +594,22 @@
                 v-model="filterStatus"
                 placeholder="全部状态"
                 clearable
-                @change="loadStudies"
+                @change="listPage=1;loadStudies()"
                 ><el-option
                   v-for="(label, key) in statusNames"
                   :key="key"
                   :label="label"
                   :value="key" /></el-select
-              ><el-date-picker
+              ><el-select v-model="filterSource" placeholder="全部数据来源" clearable @change="listPage=1;loadStudies()"><el-option label="公开演示样本" value="sample"/><el-option label="其他上传记录" value="regular"/></el-select><el-date-picker
                 v-model="dateRange"
                 type="daterange"
                 start-placeholder="开始日期"
                 end-placeholder="结束日期"
                 range-separator="至"
                 style="max-width: 260px"
-                @change="loadStudies"
-              /><el-button @click="loadStudies">查询</el-button
+                @change="listPage=1;loadStudies()"
+              /><el-button @click="listPage = 1; loadStudies()">查询</el-button
+              ><el-button @click="resetFilters">重置筛选</el-button
               ><el-button
                 v-if="canAnalyze && selectedStudies.length"
                 type="primary"
@@ -804,6 +692,7 @@
           </section>
         </template>
 
+        <AgentChat v-else-if="page === 'agent'" />
         <template v-else-if="page === 'jobs'">
           <div class="page-heading">
             <div>
@@ -864,9 +753,10 @@
                 >重试失败项</el-button
               >
             </div>
+            <p class="muted">进度包含成功与失败项，100% 表示处理完毕；请同时查看失败数量。</p><el-checkbox v-model="failedJobs[job.id]">只看失败项</el-checkbox>
             <el-collapse
               ><el-collapse-item title="查看任务明细" :name="job.id"
-                ><el-table :data="job.items"
+                ><el-table :data="failedJobs[job.id] ? job.items.filter((i:any)=>i.status==='failed') : job.items"
                   ><el-table-column label="检查" width="140"
                     ><template #default="{ row }"
                       ><el-button text @click="openStudy(row.study_id)"
@@ -919,6 +809,7 @@
               </el-button>
             </div>
           </div>
+          <AgentStatus />
           <div class="model-grid">
             <section
               v-for="model in modelList"
@@ -1030,7 +921,7 @@
                   ></el-table
                 ></el-tab-pane
               ><el-tab-pane label="操作日志" name="audit"
-                ><el-table :data="auditData.items" class="record-table" stripe
+                ><div class="toolbar"><el-input v-model="auditSearch" clearable placeholder="搜索操作、对象或人员ID" @keyup.enter="auditPage=1;loadAdmin()" @clear="auditPage=1;loadAdmin()" /><el-button @click="auditPage=1;loadAdmin()">查询日志</el-button></div><el-table :data="auditData.items" class="record-table" stripe
                   ><el-table-column
                     prop="id"
                     label="编号"
@@ -1134,6 +1025,10 @@
         ></template
       ></el-dialog
     >
+    <el-drawer v-model="patientDrawer" title="受检者档案与检查历史" size="min(650px,100vw)">
+      <template v-if="patientProfile"><h2>{{patientProfile.name}}</h2><p>{{patientProfile.code}} · {{sexNames[patientProfile.sex]}} · {{patientProfile.age ?? '年龄未填写'}}</p><p>{{patientProfile.note || '暂无备注'}}</p><el-divider />
+      <h3>最近十次检查</h3><el-table :data="patientHistory"><el-table-column prop="title" label="检查"/><el-table-column label="状态"><template #default="{row}">{{statusNames[row.status]}}</template></el-table-column><el-table-column label="日期"><template #default="{row}">{{date(row.created_at)}}</template></el-table-column><el-table-column label="详情"><template #default="{row}"><el-button text @click="openStudy(row.id)">查看</el-button></template></el-table-column></el-table><el-button @click="patientDrawer=false;viewPatientStudies(patientProfile)">查看全部检查</el-button></template>
+    </el-drawer>
     <el-drawer
       v-model="detailDrawer"
       title="检查详情"
@@ -1145,12 +1040,17 @@
         class="study-detail-content"
         :class="'detail-kind-' + detail.kind"
       >
+        <div v-if="canReview" class="toolbar wrap">
+          <el-button :disabled="!reviewNeighbors.previous" @click="openStudy(reviewNeighbors.previous)">上一条待复核</el-button>
+          <span>剩余 {{ reviewNeighbors.remaining || 0 }} 条待复核</span>
+          <el-button :disabled="!reviewNeighbors.next" @click="openStudy(reviewNeighbors.next)">下一条待复核</el-button>
+        </div>
         <section class="detail-card detail-info-card">
           <div class="detail-hero">
             <span :class="'status ' + detail.status">{{
               statusNames[detail.status]
             }}</span>
-            <h2>{{ detail.title }}</h2>
+            <h2>{{ detail.title }}</h2><el-tag v-if="detail.metadata.source?.purpose==='public_sample'" type="info">PTB-XL 公开演示样本</el-tag>
             <p>
               {{ detail.patient_name }} · {{ detail.patient_code }} · ECG-{{
                 pad(detail.id)
@@ -1368,11 +1268,11 @@
         ><el-button
           class="action-review"
           type="primary"
-          @click="saveReview"
+          @click="saveReview(false)"
           :loading="busy"
           data-testid="review-submit"
           >保存并归档</el-button
-        ></template
+        ><el-button v-if="detail && (reviewNeighbors.next || reviewNeighbors.previous)" @click="saveReview(true)" :loading="busy">归档并继续复核</el-button></template
       ></el-dialog
     >
     <el-dialog v-model="userDialog" title="新建专业人员账号" width="480px"
@@ -1463,6 +1363,10 @@ import { api, get, post, download } from "./api";
 import SignalChart from "./components/SignalChart.vue";
 import SignalIcon from "./components/SignalIcon.vue";
 import ReportIcon from "./components/ReportIcon.vue";
+import UploadGuide from "./components/UploadGuide.vue";
+import AgentStatus from "./components/AgentStatus.vue";
+import AgentChat from "./components/AgentChat.vue";
+import DashboardOverview from "./components/DashboardOverview.vue";
 
 const detailViewport = window.matchMedia("(max-width: 700px)");
 const detailColumns = ref(detailViewport.matches ? 1 : 2);
@@ -1534,6 +1438,7 @@ const allNav = [
   { key: "studies", label: "检查记录", icon: Files },
   { key: "review", label: "复核中心", icon: Checked },
   { key: "jobs", label: "批量任务", icon: List },
+  { key: "agent", label: "心电工作助手", icon: Cpu },
   { key: "models", label: "模型与状态", icon: Cpu },
   { key: "admin", label: "系统管理", icon: Setting },
 ];
@@ -1574,6 +1479,13 @@ const search = ref(""),
   auditPage = ref(1),
   adminTab = ref("users"),
   selectedStudies = ref<any[]>([]);
+const patientProfile=ref<any>(null);const patientHistory=ref<any[]>([]);const patientDrawer=ref(false);
+const reviewNeighbors = ref<any>({});
+const sortedPredictions = (items:any[]) => [...items].sort((a,b)=>Number(b.positive)-Number(a.positive));
+const capsLock = ref(false);
+const auditSearch = ref("");
+const filterSource = ref("");
+const failedJobs=reactive<Record<number,boolean>>({});
 const loginForm = reactive({ username: "", password: "" }),
   patientDialog = ref(false),
   studyDialog = ref(false),
@@ -1621,40 +1533,6 @@ const detailDrawer = ref(false),
   reviewId = ref(0),
   reviewForm = reactive({ conclusion: "confirmed", comment: "" });
 let polling: ReturnType<typeof setInterval> | undefined;
-const stats = computed(() => [
-  {
-    label: "受检者档案",
-    tone: "blue",
-    value: dashboard.value.patient_count || 0,
-    note: "已建立的基础资料",
-    icon: UserIcon,
-    color: "teal",
-  },
-  {
-    label: "全部检查",
-    tone: "indigo",
-    value: dashboard.value.study_count || 0,
-    note: "信号与报告图检查",
-    icon: Files,
-    color: "blue",
-  },
-  {
-    label: "等待复核",
-    tone: "amber",
-    value: dashboard.value.counts?.awaiting_review || 0,
-    note: "模型已完成分析",
-    icon: Checked,
-    color: "orange",
-  },
-  {
-    label: "已归档",
-    tone: "green",
-    value: dashboard.value.counts?.archived || 0,
-    note: "已保存专业复核意见",
-    icon: Document,
-    color: "teal",
-  },
-]);
 function date(v: string) {
   return v
     ? new Date(v).toLocaleString("zh-CN", {
@@ -1672,9 +1550,9 @@ function pad(n: number) {
 function kindName(k: string) {
   return k === "signal" ? "数字信号" : "标准报告图";
 }
-function go(key: string) {
+function go(key: string, query: Record<string, string> = {}) {
   mobileNav.value = false;
-  router.push("/" + key);
+  router.push({ path: "/" + key, query });
 }
 function openDocs() {
   window.open("/docs", "_blank", "noopener");
@@ -1720,9 +1598,28 @@ async function loadPatientOptions() {
   }
   patientOptions.value = all;
 }
+function restoreFilters() {
+  const q = route.query;
+  search.value = String(q.q || ""); filterKind.value = String(q.kind || "");
+  filterStatus.value = String(q.status || "");filterSource.value=String(q.source || ""); patientFilter.value = Number(q.patient_id) || null;
+  listPage.value = Math.max(1, Number(q.page) || 1);
+  dateRange.value = q.from && q.to ? [new Date(String(q.from)), new Date(String(q.to))] : null;
+}
+async function resetFilters() {
+ search.value="";filterSource.value="";filterKind.value="";filterStatus.value="";patientFilter.value=null;dateRange.value=null;listPage.value=1;
+ await loadStudies();
+}
 async function loadStudies() {
+  const query: Record<string,string> = {};
+  if(filterSource.value)query.source=filterSource.value;
+  if(search.value) query.q=search.value; if(filterKind.value) query.kind=filterKind.value;
+  if(filterStatus.value) query.status=filterStatus.value; if(patientFilter.value) query.patient_id=String(patientFilter.value);
+  if(dateRange.value){query.from=dateRange.value[0].toISOString();query.to=dateRange.value[1].toISOString();}
+  if(listPage.value>1)query.page=String(listPage.value);
+  if(["studies","review"].includes(page.value)) await router.replace({query});
   studies.value = await get("/studies", {
     q: search.value,
+    source: filterSource.value,
     kind: filterKind.value,
     status: page.value === "review" ? "awaiting_review" : filterStatus.value,
     patient_id: patientFilter.value || undefined,
@@ -1787,7 +1684,7 @@ async function loadAdmin() {
   if (user.value?.role === "admin") {
     [userList.value, auditData.value] = await Promise.all([
       get("/users"),
-      get("/audit", { page: auditPage.value }),
+      get("/audit", { page: auditPage.value, q: auditSearch.value }),
     ]);
   }
 }
@@ -1844,9 +1741,11 @@ async function removePatient(row: any) {
     await loadPatients();
   } catch {}
 }
+async function viewPatient(row:any){
+ patientProfile.value=row;const r=await get('/studies',{patient_id:row.id,page_size:10});patientHistory.value=r.items;patientDrawer.value=true;
+}
 function viewPatientStudies(row: any) {
-  patientFilter.value = row.id;
-  go("studies");
+  go("studies", {patient_id:String(row.id)});
 }
 async function createEmptyStudy() {
   if (!studyForm.patient_id || !studyForm.title.trim()) {
@@ -1942,6 +1841,7 @@ async function openStudy(id: number) {
     const study = await get(`/studies/${id}`);
     if (detail.value?.id !== id) detailLead.value = "II";
     detail.value = study;
+    reviewNeighbors.value = canReview.value ? await get(`/studies/${id}/review-neighbors`) : {};
     clearDetailPreview();
     if (detail.value.metadata.storage_key) {
       const p = await previewFor(detail.value);
@@ -1994,18 +1894,20 @@ function showReview(a: any) {
   reviewForm.conclusion = "confirmed";
   reviewDialog.value = true;
 }
-async function saveReview() {
+async function saveReview(continueNext = false) {
   if (reviewForm.comment.trim().length < 5) {
     ElMessage.warning("复核意见至少5个字符");
     return;
   }
   await guarded(async () => {
+    const nextId = reviewNeighbors.value.next || reviewNeighbors.value.previous;
     const a = await post(`/analyses/${reviewId.value}/reviews`, reviewForm);
     reviewDialog.value = false;
     if (latestAnalysis.value?.id === a.id) latestAnalysis.value = a;
     if (detail.value) await openStudy(detail.value.id);
     await loadPage();
     ElMessage.success("复核意见已保存并归档");
+    if(continueNext && nextId) await openStudy(nextId);
   });
 }
 async function downloadReport(id: number) {
@@ -2052,6 +1954,8 @@ async function createUser() {
   });
 }
 async function updateRole(row: any, role: string) {
+  try { await ElMessageBox.confirm(`将 ${row.name}（${row.username}）的角色改为 ${roleNames[role]}？`, "确认权限变更", {type:"warning"}); }
+  catch {await loadAdmin();return;}
   await guarded(async () => {
     await api.patch(`/users/${row.id}`, { role });
     await loadAdmin();
@@ -2059,8 +1963,10 @@ async function updateRole(row: any, role: string) {
   });
 }
 async function toggleUser(row: any) {
+  try {await ElMessageBox.confirm(`${row.active ? "停用后该账号将无法继续操作。确认停用" : "确认启用"} ${row.name}（${row.username}）？`, "确认账号状态", {type:"warning"});}catch{return;}
   await guarded(async () => {
     await api.patch(`/users/${row.id}`, { active: !row.active });
+    ElMessage.success(row.active ? "账号已停用" : "账号已启用");
     await loadAdmin();
   });
 }
@@ -2074,15 +1980,18 @@ async function changePassword() {
   });
 }
 watch(page, async (n, o) => {
-  search.value = "";
-  dateRange.value = null;
-  filterKind.value = "";
-  filterStatus.value = "";
-  listPage.value = 1;
+  restoreFilters();
   selectedStudies.value = [];
   if (["signal", "image"].includes(o) && n !== o && activeStudy.value)
     resetWorkspace();
   await loadPage();
+});
+watch(() => route.query, async () => {
+ if(["studies","review"].includes(page.value) && user.value){
+   const current = JSON.stringify([search.value,filterKind.value,filterStatus.value,filterSource.value,patientFilter.value,listPage.value,dateRange.value]);
+   restoreFilters();
+   if(current !== JSON.stringify([search.value,filterKind.value,filterStatus.value,filterSource.value,patientFilter.value,listPage.value,dateRange.value])) await loadStudies();
+ }
 });
 watch(studyDialog, async (v) => {
   if (v)
@@ -2095,6 +2004,7 @@ onMounted(async () => {
   if (sessionStorage.getItem("ecg-token"))
     try {
       user.value = await get("/auth/me");
+      restoreFilters();
       await loadPage();
     } catch {
       logout();
