@@ -1,4 +1,5 @@
 <template>
+  <div class="wave-tools"><span>时间窗口 {{windowLabel}}</span><el-button size="small" @click="zoom(0,20)">前2秒</el-button><el-button size="small" @click="zoom(20,40)">2—4秒</el-button><el-button size="small" @click="zoom(0,100)">重置全段</el-button><small>滚轮缩放 · 拖动浏览 · 点击图例切换导联</small></div>
   <div
     ref="host"
     class="signal-chart"
@@ -26,6 +27,9 @@ echarts.use([
 ]);
 const props = defineProps<{ data: any; selected: string[] }>();
 const host = ref<HTMLElement>();
+const windowLabel=ref('0.0—10.0 秒');
+function zoom(start:number,end:number){chart?.dispatchAction({type:'dataZoom',start,end});windowLabel.value=`${(start/10).toFixed(1)}—${(end/10).toFixed(1)} 秒`;}
+
 let chart: echarts.ECharts | undefined;
 let observer: ResizeObserver | undefined;
 let resizeFrame: number | undefined;
@@ -33,6 +37,7 @@ let observedWidth = 0;
 let observedHeight = 0;
 function render() {
   if (!chart || !props.data) return;
+  windowLabel.value='0.0—10.0 秒';
   const names = props.selected.length ? props.selected : ["II"];
   chart.setOption(
     {
@@ -121,6 +126,7 @@ function render() {
 }
 onMounted(() => {
   chart = echarts.init(host.value!);
+  chart.on('datazoom',()=>{const option=chart?.getOption() as any;const z=option?.dataZoom?.[0];if(z)windowLabel.value=`${(z.start/10).toFixed(1)}—${(z.end/10).toFixed(1)} 秒`;});
   observer = new ResizeObserver(([entry]) => {
     if (!entry) return;
     const { width, height } = entry.contentRect;
@@ -144,3 +150,5 @@ onBeforeUnmount(() => {
   chart?.dispose();
 });
 </script>
+
+<style scoped>.wave-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px;color:#597b99}.wave-tools small{flex-basis:100%}.wave-tools .el-button{margin-left:0}</style>

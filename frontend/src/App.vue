@@ -263,7 +263,7 @@
               />
               <el-form
                 label-position="top"
-                :disabled="!canAnalyze || !!activeStudy"
+                :disabled="!canAnalyze || !!activeStudy || busy"
                 ><el-form-item label="受检者档案"
                   ><el-select
                     v-model="studyForm.patient_id"
@@ -301,7 +301,7 @@
                       label="原始波形：由系统进行40 Hz低通"
                       value="raw_mv" /></el-select
                 ></el-form-item>
-                <UploadGuide :kind="page" :files="selectedFiles" @sample="files => { selectedFiles=files;inputProfile='filtered_mv'; }" />
+                <UploadGuide :kind="page" :files="selectedFiles" @sample="files => { if(!busy && !activeStudy){selectedFiles=files;inputProfile='filtered_mv';} }" />
                 <div v-if="page === 'signal' && (!selectedFiles.length || selectedFiles.some(f => f.name.toLowerCase().endsWith('.csv')))" class="two-fields">
                   <el-form-item label="CSV采样率"
                     ><el-input-number
@@ -318,7 +318,8 @@
                 </div> </el-form
               ><label
                 class="upload-zone"
-                :class="{ disabled: !canAnalyze || !!activeStudy }"
+                  @dragover.prevent="dragging=true" @dragleave.prevent="dragging=false" @drop.prevent="dropFiles"
+                :class="{ disabled: !canAnalyze || !!activeStudy, dragging }"
                 ><input
                   ref="fileInput"
                   type="file"
@@ -326,7 +327,7 @@
                     page === 'signal' ? '.csv,.hea,.dat' : '.png,.jpg,.jpeg'
                   "
                   :multiple="page === 'signal'"
-                  :disabled="!canAnalyze || !!activeStudy"
+                  :disabled="!canAnalyze || !!activeStudy || busy"
                   @change="filesChanged"
                   data-testid="workspace-files"
                 /><el-icon><UploadFilled /></el-icon
@@ -342,6 +343,8 @@
                 }}</span
                 ><small>单次总大小不超过16 MB</small></label
               >
+              <el-alert v-if="fileIssue" :title="fileIssue" type="warning" :closable="false" />
+              <div v-if="transferState" role="status" aria-live="polite"><p>{{transferState}}</p><el-progress :percentage="uploadPercent" /></div>
               <div class="file-chips">
                 <span v-for="f in selectedFiles" :key="f.name"
                   >{{ f.name }}
@@ -423,6 +426,7 @@
                     :closable="false"
                     class="warning-line"
                 /></template>
+                <div v-else-if="localImage" class="local-image-preview"><el-tag type="warning">本地预览 · 尚未保存与校验</el-tag><el-image :src="localImage" :preview-src-list="[localImage]" fit="contain" class="report-preview" /></div>
                 <div v-else class="preview-empty">
                   <svg viewBox="0 0 260 80">
                     <path
@@ -459,6 +463,7 @@
                     {{ analyzing ? "正在分析" : "开始分析" }}</el-button
                   >
                 </div>
+                <div v-if="analysisPhase" class="analysis-feedback" role="status" aria-live="polite"><span :class="{pulse:analyzing}"></span>{{analysisPhase}} <small v-if="analyzing">已等待 {{elapsedSeconds}} 秒</small></div>
                 <template v-if="latestAnalysis"
                   ><div class="result-summary">
                     <span
@@ -1241,8 +1246,8 @@
         </section>
       </div>
     </el-drawer>
-    <el-dialog v-model="reviewDialog" title="专业复核与归档" width="560px"
-      ><el-alert
+    <el-dialog v-model="reviewDialog" title="专业复核与归档" width="min(1100px, 96vw)"
+      ><div class="review-workspace"><section class="review-context"><h3>检查输入与模型结果</h3><template v-if="detail || activeStudy"><p>{{(detail || activeStudy).title}} · #{{(detail || activeStudy).id}}</p><SignalChart v-if="detail ? detail.kind==='signal' && detailSignal : signalPreview" :data="detailSignal || signalPreview" :selected="[detailLead || 'II']" /><el-image v-else-if="detailImage || imagePreview" :src="detailImage || imagePreview" :preview-src-list="[detailImage || imagePreview]" class="report-preview" fit="contain" /><div v-for="p in (detail?.analyses?.find((a:any)=>a.id===reviewId) || latestAnalysis)?.predictions || []" :key="p.code" class="review-score"><span>{{p.code}} · {{p.name}}</span><strong>{{(p.probability*100).toFixed(1)}}% · {{p.positive?'阳性':'阴性'}}</strong></div><p class="muted">模型分数不代表患病概率，请结合输入独立复核。</p></template></section><section><el-alert
         title="请结合原始数据与模型预测独立复核。意见将作为新记录保存，不覆盖模型输出。"
         type="info"
         :closable="false"
@@ -1262,8 +1267,7 @@
             minlength="5"
             maxlength="5000"
             placeholder="填写复核意见，至少5个字符"
-            data-testid="review-comment" /></el-form-item></el-form
-      ><template #footer
+            data-testid="review-comment" /></el-form-item></el-form></section></div><template #footer
         ><el-button @click="reviewDialog = false">取消</el-button
         ><el-button
           class="action-review"
@@ -1482,6 +1486,18 @@ const search = ref(""),
 const patientProfile=ref<any>(null);const patientHistory=ref<any[]>([]);const patientDrawer=ref(false);
 const reviewNeighbors = ref<any>({});
 const sortedPredictions = (items:any[]) => [...items].sort((a,b)=>Number(b.positive)-Number(a.positive));
+const dragging=ref(false), localImage=ref(''), uploadPercent=ref(0), transferState=ref(''), analysisPhase=ref(''), elapsedSeconds=ref(0);
+const fileIssue=computed(()=>{
+ const files=selectedFiles.value;if(!files.length)return '';
+ if(files.reduce((a,f)=>a+f.size,0)>16*1024*1024)return '文件总大小超过16 MB';
+ const names=files.map(f=>f.name.toLowerCase());
+ if(page.value==='image')return files.length===1 && /\.(png|jpe?g)$/.test(names[0])?'':'请选择一张 PNG 或 JPEG 图片';
+ if(files.length===1 && names[0].endsWith('.csv'))return '';
+ if(files.length===2 && names.some(n=>n.endsWith('.hea')) && names.some(n=>n.endsWith('.dat')) && names[0].slice(0,-4)===names[1].slice(0,-4))return '';
+ return '请选择一份 CSV，或同名的 .hea 与 .dat 配对文件';
+});
+function dropFiles(event:DragEvent){dragging.value=false;if(!canAnalyze.value||activeStudy.value||busy.value)return;selectedFiles.value=Array.from(event.dataTransfer?.files||[]);}
+
 const capsLock = ref(false);
 const auditSearch = ref("");
 const filterSource = ref("");
@@ -1761,10 +1777,12 @@ async function createEmptyStudy() {
     ElMessage.success("检查已建立，请选择文件上传");
   });
 }
+watch(selectedFiles,files=>{if(localImage.value)URL.revokeObjectURL(localImage.value);localImage.value='';if(page.value==='image'&&files.length===1&&/\.(png|jpe?g)$/i.test(files[0].name))localImage.value=URL.createObjectURL(files[0]);});
 function filesChanged(e: Event) {
   selectedFiles.value = Array.from((e.target as HTMLInputElement).files || []);
 }
 function resetWorkspace() {
+  transferState.value="";analysisPhase.value="";uploadPercent.value=0;
   activeStudy.value = null;
   latestAnalysis.value = null;
   signalPreview.value = null;
@@ -1787,6 +1805,7 @@ async function submitInput() {
     ElMessage.warning("请选择档案并填写检查名称");
     return;
   }
+  if(!selectedFiles.value.length || fileIssue.value){ElMessage.warning(fileIssue.value || "请先选择文件");return;}
   if (selectedFiles.value.reduce((a, f) => a + f.size, 0) > 16 * 1024 * 1024) {
     ElMessage.warning("上传总大小不能超过16 MB");
     return;
@@ -1801,7 +1820,10 @@ async function submitInput() {
     form.append("profile", inputProfile.value);
     form.append("sampling_rate", String(samplingRate.value));
     form.append("unit", inputUnit.value);
-    const r = await post(`/studies/${draftId.value}/assets`, form);
+    uploadPercent.value=0;transferState.value='正在上传';
+      let r:any;
+      try {const response=await api.post(`/studies/${draftId.value}/assets`,form,{onUploadProgress:event=>{uploadPercent.value=event.total?Math.round(event.loaded/event.total*100):0;if(uploadPercent.value===100)transferState.value='上传完成，正在校验输入';}});r=response.data.result;transferState.value='校验通过';}
+      catch(error){transferState.value='上传或校验失败，请检查提示后重试';throw error;}
     activeStudy.value = r;
     const p = await previewFor(r);
     if (r.kind === "signal") signalPreview.value = p;
@@ -1811,28 +1833,39 @@ async function submitInput() {
 }
 async function runAnalysis() {
   if (!activeStudy.value) return;
+  const runningStudy=activeStudy.value;
   analyzing.value = true;
   const start = performance.now();
+  analysisPhase.value='分析请求已提交，等待服务返回';elapsedSeconds.value=0;
+  let checking=false;
+  const ticker=setInterval(async()=>{elapsedSeconds.value=Math.floor((performance.now()-start)/1000);if(checking)return;checking=true;try{const r=await get(`/studies/${runningStudy.id}`);if(!analyzing.value || activeStudy.value?.id!==runningStudy.id)return;analysisPhase.value=({processing:'模型正在分析',queued:'任务正在排队',awaiting_review:'结果已保存，正在展示'} as Record<string,string>)[r.status]||'等待分析服务返回';}catch{}finally{checking=false;}},1000);
   try {
-    latestAnalysis.value = await post(
-      `/studies/${activeStudy.value.id}/analyses`,
+    const result = await post(
+      `/studies/${runningStudy.id}/analyses`,
     );
+    if(activeStudy.value?.id!==runningStudy.id)return;
+    latestAnalysis.value=result;
     activeStudy.value.status = "awaiting_review";
+    analysisPhase.value="分析完成，结果已保存，等待专业复核";
     await nextTick();
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
     );
     displayMs.value = performance.now() - start;
+    document.querySelector(".result-panel")?.scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"});
     window.dispatchEvent(
       new CustomEvent("ecg-analysis-rendered", {
-        detail: { studyId: activeStudy.value.id, displayMs: displayMs.value },
+        detail: { studyId: runningStudy.id, displayMs: displayMs.value },
       }),
     );
   } catch {
+    analysisPhase.value="分析未完成，请检查服务提示及记录状态后重试";
     try {
-      activeStudy.value = await get(`/studies/${activeStudy.value.id}`);
+      activeStudy.value = await get(`/studies/${runningStudy.id}`);
     } catch {}
   } finally {
+    clearInterval(ticker);
+    if(!latestAnalysis.value)analysisPhase.value="分析未完成，请检查提示及检查状态后重试";
     analyzing.value = false;
   }
 }
@@ -2022,5 +2055,6 @@ onBeforeUnmount(() => {
   window.removeEventListener("ecg-logout", logout);
   clearDetailPreview();
   if (imagePreview.value) URL.revokeObjectURL(imagePreview.value);
+  if(localImage.value)URL.revokeObjectURL(localImage.value);
 });
 </script>
