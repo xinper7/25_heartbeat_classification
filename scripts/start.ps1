@@ -1,4 +1,4 @@
-param([switch]$Dev, [switch]$Build)
+param([switch]$Dev, [switch]$Build, [switch]$SkipAgentDownload)
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location -LiteralPath $projectRoot
@@ -24,6 +24,11 @@ foreach ($port in $ports) {
     }
 }
 New-Item -ItemType Directory -Path 'runtime' -Force | Out-Null
+if (-not $SkipAgentDownload) {
+    & $projectPython scripts\ensure_agent.py
+    if ($LASTEXITCODE -ne 0) { throw 'Agent installation failed. Check network/model directory, or use -SkipAgentDownload for classifier-only mode.' }
+}
+
 $localEnv = Get-Content -LiteralPath '.env' -Raw
 if ($localEnv -match '(?m)^DATABASE_URL=[^\r\n]*@127\.0\.0\.1:3307/' -and (Test-Path -LiteralPath 'runtime\mysql-process.json')) {
     $dbProcess = Get-Content -LiteralPath 'runtime\mysql-process.json' -Raw | ConvertFrom-Json

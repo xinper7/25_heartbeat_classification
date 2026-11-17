@@ -4,6 +4,8 @@
 
 本次更新内容与验证结果见 [项目修改说明](项目修改说明.md)。
 
+Agent 模型通过 [GitHub Releases](https://github.com/xinper7/25_heartbeat_classification/releases/tag/agent-model-v2) 交付。首次正常启动会自动下载约 1.03 GB 的模型包、校验并安装；已有完整模型时跳过下载。也可先运行 `.venv/Scripts/python.exe scripts/ensure_agent.py`。模型包不随 `git clone` 下载。
+
 ## 功能与技术
 
 - Vue 3 + TypeScript + Vite + Element Plus；Axios请求；ECharts交互波形。
