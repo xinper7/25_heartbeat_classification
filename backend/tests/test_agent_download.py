@@ -24,3 +24,17 @@ def test_download_verified_before_import(tmp_path,monkeypatch):
  def imported(*a,**k):calls.append(a);install(tmp_path/'runtime/agent')
  monkeypatch.setattr(module.subprocess,'run',imported);module.main();assert len(calls)==1
  assert (tmp_path/'runtime/downloads/model.zip').read_bytes()==data
+
+def test_rate_limit_falls_back_to_pinned_asset(tmp_path,monkeypatch):
+ monkeypatch.setattr(module,'ROOT',tmp_path);monkeypatch.delenv('GITHUB_TOKEN',raising=False)
+ data=b'checked bundle';folder=tmp_path/'artifacts/agent';folder.mkdir(parents=True)
+ (folder/'release.json').write_text(json.dumps(dict(repository='owner/repo',tag='v2',asset='model.zip',bytes=len(data),sha256=hashlib.sha256(data).hexdigest())))
+ urls=[]
+ def response(req,**kwargs):
+  urls.append(req.full_url)
+  if 'api.github.com' in req.full_url:raise module.urllib.error.HTTPError(req.full_url,403,'rate limited',{},None)
+  return io.BytesIO(data)
+ monkeypatch.setattr(module.urllib.request,'urlopen',response)
+ monkeypatch.setattr(module.subprocess,'run',lambda *a,**k:install(tmp_path/'runtime/agent'))
+ module.main()
+ assert urls[-1]=='https://github.com/owner/repo/releases/download/v2/model.zip'

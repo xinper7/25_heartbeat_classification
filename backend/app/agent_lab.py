@@ -122,9 +122,21 @@ def clarify(query):
   return '已取消分析意图。请明确本轮是读取已有结果、查询模型，还是查看上传说明。'
  if re.search(r'(同时|然后|并且|再帮|再读|之后)',query) and sum(bool(re.search(x,query)) for x in ['分析|推理|识别','结果|结论','上传|格式','模型|版本'])>1:
   return '本轮请只选择一项操作，完成后再提出下一项。'
- if not re.search(r'心电|ECG|ecg|信号|波形|报告|图片|照片|导联|CSV|csv|hea|dat|上传|采样|单位|格式|模型|推理|阈值|结果|预测|复核|检查|分析|版本',query):
+ if re.search(r'天气|股票|彩票|讲笑话|写诗',query):
   return '我支持心电检查的分析、结果读取、上传说明和模型信息。请明确需要哪一项。'
  return None
+
+def routing_query(query, messages, study):
+ """Include bounded context for elliptical follow-ups; explicit requests stay unchanged."""
+ import re
+ if not messages or not re.search(r'刚才|上次|它|这个|那个|继续|再来|出来了吗|怎么样了',query):return query
+ history=[]
+ for message in messages[-6:]:
+  if message.get('role')=='user':history.append('用户：'+str(message.get('content',''))[:160])
+  for call in message.get('tool_calls',[]):
+   if call.get('name') in NAMES:history.append('已执行工具：'+call['name'])
+ state=f'当前检查类型：{study.kind}。' if study else '当前未选择检查。'
+ return '最近操作（仅用于理解省略指代）：\n'+'\n'.join(history[-6:])+'\n'+state+'\n当前请求：'+query
 
 @router.get('/status')
 def agent_status(user:User=Depends(current_user)):
@@ -135,7 +147,7 @@ def agent_status(user:User=Depends(current_user)):
  metrics={}
  if path.exists():
   try:
-   data=json.loads(path.read_text(encoding='utf-8')); metrics=dict(accuracy=data['finetuned']['accuracy'],test_samples=data['test_samples'],train_samples=data['train_samples'])
+   data=json.loads(path.read_text(encoding='utf-8')); metrics=dict(accuracy=data['finetuned']['accuracy'],test_samples=data['test_samples'],train_samples=data['train_samples'],scope='适配器离线分类评估，非当前端到端成功率',adapter=adapter_folder.relative_to(folder).as_posix(),source=path.relative_to(folder).as_posix())
   except (ValueError,KeyError): pass
  return dict(code=0,result=dict(base_ready=base,adapter_ready=adapter,loaded=local_model.cache_info().currsize>0,ready=base and adapter,metrics=metrics,scope='仅五类工具路由；确认后执行；不生成医学诊断'),msg='成功')
 
@@ -151,7 +163,7 @@ def plan(body:ChatIn,db=Depends(get_db),user:User=Depends(current_user)):
  if hint:return dict(code=0,result=dict(clarification=hint),msg='需要澄清')
  if body.selected_tool and body.selected_tool not in NAMES:raise HTTPException(400,'不支持的工具')
  if not guard.acquire(blocking=False):raise HTTPException(429,'助手正在处理其他请求，请稍后重试')
- try: name=body.selected_tool or choose(body.query)
+ try: name=body.selected_tool or choose(routing_query(body.query,json.loads(row[2]) if row else [],study))
  finally:guard.release()
  if name not in NAMES:raise HTTPException(400,'无法确定操作，请重新描述')
  if name in NAMES[:3] and not study:return dict(code=0,result=dict(clarification='请先在上方选择检查记录。'),msg='需要选择检查')
@@ -227,7 +239,7 @@ def chat(body:ChatIn,db=Depends(get_db),user:User=Depends(current_user)):
    """读取发布清单中的两份模型信息。"""
    manifest=json.loads(read_with_retry(lambda:(get_settings().models_dir/'manifest.json').read_text(encoding='utf-8')))
    return '\n'.join(f"{k}：{v['version']}；输入 {v['input_shape']}；类别 {', '.join(v['classes'])}" for k,v in manifest.items())
-  graph=create_agent(RouterModel(query=body.query,planned_tool=planned_tool),[analyze_signal,analyze_image,read_result,input_help,model_info])
+  graph=create_agent(RouterModel(query=routing_query(body.query,messages,study),planned_tool=planned_tool),[analyze_signal,analyze_image,read_result,input_help,model_info])
   output=graph.invoke({'messages':[{'role':'user','content':body.query}]},{'recursion_limit':5})
   calls=[dict(name=c['name'],args=c['args']) for m in output['messages'] if isinstance(m,AIMessage) for c in m.tool_calls]
   answer=output['messages'][-1].content

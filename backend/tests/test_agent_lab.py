@@ -100,3 +100,20 @@ def test_read_timeout_exhaustion(monkeypatch):
  with pytest.raises(HTTPException) as error:agent_lab.read_with_retry(timeout)
  assert error.value.status_code==503
  assert len(attempts)==4
+
+def test_legitimate_paraphrases_reach_router(client,headers,monkeypatch):
+ seen=[]
+ def route(q):seen.append(q);return 'model_info'
+ monkeypatch.setattr(agent_lab,'choose',route)
+ for query in ['将选定的十二路电压序列送入分类器','把已完成记录的分类输出调出来','请列出两种已部署分类器的输入规格']:
+  r=client.post('/api/v1/agent/plan',headers=headers(),json={'query':query})
+  assert r.status_code==200 and r.json()['result']['tool']=='model_info'
+ assert len(seen)==3
+
+def test_followup_context_bounded_and_explicit_query_unchanged():
+ messages=[{'role':'user','content':'分析数字信号'},{'role':'agent','content':'private result','tool_calls':[{'name':'analyze_signal'}]}]
+ text=agent_lab.routing_query('刚才的结果出来了吗',messages,None)
+ assert '分析数字信号' in text and 'analyze_signal' in text and '当前请求' in text
+ assert 'private result' not in text
+ assert agent_lab.routing_query('怎么上传文件',messages,None)=='怎么上传文件'
+ assert len(agent_lab.routing_query('继续',[{'role':'user','content':'x'*10000}]*100,None))<1500

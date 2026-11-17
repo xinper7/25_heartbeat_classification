@@ -2,7 +2,7 @@
   <section class="agent-workspace">
     <div class="page-heading"><div><h1>心电工作助手</h1><p>询问上传要求、模型信息，或选择检查后读取结果、运行分析。</p></div><el-tag>本地 Qwen · LoRA</el-tag></div>
     <el-alert title="助手仅编排已有工具并展示其返回结果，分析结论需要专业复核。" type="info" :closable="false" />
-    <el-alert v-if="status" :title="`Agent：${status.ready ? (status.loaded ? '已加载' : '文件就绪，首次操作时加载') : '模型文件未就绪'}；验证集工具选择正确率 ${status.metrics?.accuracy == null ? '未测量' : (status.metrics.accuracy*100).toFixed(0)+'%'}（${status.metrics?.test_samples || 0} 条）。请核对工具后确认。`" type="warning" :closable="false" />
+    <el-alert v-if="status" :title="`Agent：${status.ready ? (status.loaded ? '已加载' : '文件就绪，首次操作时加载') : '模型文件未就绪'}；适配器离线分类正确率 ${status.metrics?.accuracy == null ? '未测量' : (status.metrics.accuracy*100).toFixed(0)+'%'}（${status.metrics?.test_samples || 0} 条，非当前端到端成功率）；适配器 ${status.metrics?.adapter || '未标注'}。请核对工具后确认。`" type="warning" :closable="false" />
     <div class="agent-controls">
       <el-select v-model="studyId" placeholder="可选：选择检查记录" filterable clearable data-testid="agent-study">
         <el-option v-for="s in studies" :key="s.id" :value="s.id" :label="`#${s.id} · ${s.title} · ${s.kind === 'signal' ? '信号' : '图片'}`" />

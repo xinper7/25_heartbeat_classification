@@ -1,5 +1,5 @@
 """Install pinned release models once; never overwrite an existing model directory."""
-import hashlib,json,os,subprocess,sys,urllib.request
+import hashlib,json,os,subprocess,sys,urllib.request,urllib.error
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 def ready(folder):
@@ -20,10 +20,16 @@ def main():
   req=urllib.request.Request(url,headers={k:v for k,v in headers.items() if k!='Authorization'})
   if headers.get('Authorization'):req.add_unredirected_header('Authorization',headers['Authorization'])
   return urllib.request.urlopen(req,timeout=120)
- with request(url) as r:release=json.load(r)
- asset=next((a for a in release['assets'] if a['name']==spec['asset']),None)
- if not asset:raise RuntimeError('Published model attachment is missing')
- download=asset['url'] if token else asset['browser_download_url'];download_headers=headers|({'Accept':'application/octet-stream'} if token else {})
+ try:
+  with request(url) as r:release=json.load(r)
+  asset=next((a for a in release['assets'] if a['name']==spec['asset']),None)
+  if not asset:raise RuntimeError('Published model attachment is missing')
+  download=asset['url'] if token else asset['browser_download_url'];download_headers=headers|({'Accept':'application/octet-stream'} if token else {})
+ except urllib.error.HTTPError as error:
+  if error.code not in (403,429):raise
+  print('Release API rate limited; using pinned public attachment URL.',flush=True)
+  download=f"https://github.com/{repo}/releases/download/{spec['tag']}/{spec['asset']}"
+  download_headers={'User-Agent':'Cardio-Model-Installer'}
  folder=ROOT/'runtime/downloads';folder.mkdir(parents=True,exist_ok=True);archive=folder/spec['asset'];part=archive.with_suffix('.part')
  def valid(path):
   if not path.exists() or path.stat().st_size!=spec['bytes']:return False
