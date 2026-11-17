@@ -82,6 +82,8 @@ async def lifespan(app):
     with SessionLocal() as db:
         db.execute(text("SELECT 1"))
     get_engine().warmup()
+    from .agent_lab import start_warmup
+    start_warmup()
     yield
 
 
@@ -340,24 +342,15 @@ def delete_patient(patient_id: int, db: DB, user: Analyst):
     return ok()
 
 
-@app.get("/api/v1/studies", tags=["studies"], response_model=ApiResponse)
-def studies(
-    db: DB,
-    user: Actor,
-    q: str = "",
-    kind: str = "",
-    status: str = "",
-    source: str = "",
-    patient_id: int | None = None,
-    date_from: datetime | None = None,
-    date_to: datetime | None = None,
-    page: int = 1,
-    page_size: int = 20,
-):
-    page, page_size = max(1, page), max(1, min(100, page_size))
+def filtered_studies(db, user, q="", kind="", status="", source="", patient_id=None, date_from=None, date_to=None):
     query = select(Study).join(Patient)
     if user.role == "analyst":
         query = query.where(Study.owner_id == user.id)
+    if q:
+        numeric=q.strip().upper().removeprefix('ECG-').lstrip('#')
+        if numeric.isdigit():
+            query=query.where(Study.id==int(numeric))
+            q=''
     if q:
         query = query.where(
             or_(
@@ -390,6 +383,25 @@ def studies(
             else date_to
         )
         query = query.where(Study.created_at <= date_to)
+    return query
+
+
+@app.get("/api/v1/studies", tags=["studies"], response_model=ApiResponse)
+def studies(
+    db: DB,
+    user: Actor,
+    q: str = "",
+    kind: str = "",
+    status: str = "",
+    source: str = "",
+    patient_id: int | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    page: int = 1,
+    page_size: int = 20,
+):
+    page, page_size = max(1, page), max(1, min(100, page_size))
+    query = filtered_studies(db,user,q,kind,status,source,patient_id,date_from,date_to)
     total = db.scalar(select(func.count()).select_from(query.subquery()))
     rows = db.scalars(
         query.order_by(Study.id.desc()).offset((page - 1) * page_size).limit(page_size)
@@ -563,21 +575,17 @@ def report(analysis_id: int, db: DB, user: Actor):
     if not analysis:
         raise HTTPException(404, "分析记录不存在")
     study = access_study(db, analysis.study_id, user)
-    return HTMLResponse(
-        report_html(db, study, analysis),
-        headers={
-            "Content-Disposition": f'attachment; filename="ecg-report-{analysis.id}.html"',
-            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
-        },
-    )
+    from .pdf_report import report_pdf
+    return Response(report_pdf(db, study, analysis), media_type="application/pdf", headers={
+        "Content-Disposition": f'attachment; filename="ecg-report-{analysis.id}.pdf"',
+        "Cache-Control": "no-store",
+    })
 
 
 @app.get("/api/v1/exports/studies.csv", tags=["reports"])
-def export_studies(db: DB, user: Actor):
-    query = select(Study)
-    if user.role == "analyst":
-        query = query.where(Study.owner_id == user.id)
-    rows = db.scalars(query.order_by(Study.id.desc()).limit(5000)).all()
+def export_studies(db: DB, user: Actor, q: str="", kind: str="", status: str="", source: str="", patient_id: int|None=None, date_from: datetime|None=None, date_to: datetime|None=None):
+    query=filtered_studies(db,user,q,kind,status,source,patient_id,date_from,date_to)
+    rows = db.scalars(query.order_by(Study.id.desc())).all()
     return Response(
         export_csv(db, rows),
         media_type="text/csv; charset=utf-8",

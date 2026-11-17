@@ -21,7 +21,9 @@ from fastapi.testclient import TestClient
 
 
 @pytest.fixture
-def client():
+def client(monkeypatch):
+    from app import agent_lab
+    monkeypatch.setattr(agent_lab, "start_warmup", lambda: None)
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     app.state.login_hits = {}

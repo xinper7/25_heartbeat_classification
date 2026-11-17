@@ -117,3 +117,24 @@ def test_followup_context_bounded_and_explicit_query_unchanged():
  assert 'private result' not in text
  assert agent_lab.routing_query('怎么上传文件',messages,None)=='怎么上传文件'
  assert len(agent_lab.routing_query('继续',[{'role':'user','content':'x'*10000}]*100,None))<1500
+
+def test_background_warmup_success_and_failure(monkeypatch):
+ from app import agent_lab as a
+ monkeypatch.setattr(a,'_warm_thread',None)
+ monkeypatch.setattr(a,'_warm_state',{'phase':'idle','error':None})
+ monkeypatch.setattr(a,'choose',lambda q:'input_help')
+ a.start_warmup(); a._warm_thread.join(timeout=2)
+ assert a._warm_state['phase']=='ready'
+ def fail(q): raise OSError('missing model')
+ monkeypatch.setattr(a,'choose',fail)
+ a.start_warmup(); a._warm_thread.join(timeout=2)
+ assert a._warm_state['phase']=='failed'
+ assert a._warm_state['error']
+
+def test_followup_has_bounded_context_and_explicit_query_unchanged():
+ from app import agent_lab as a
+ from types import SimpleNamespace
+ history=[{'role':'user','content':'读取结果'},{'role':'agent','tool_calls':[{'name':'read_result'}]}]
+ q=a.routing_query('它怎么样了',history,SimpleNamespace(kind='signal'))
+ assert 'read_result' in q and 'signal' in q
+ assert a.routing_query('上传CSV要求',history,None)=='上传CSV要求'

@@ -179,13 +179,13 @@
                 min-width="180"
                 show-overflow-tooltip /><el-table-column
                 label="操作"
-                width="280"
+                width="360"
                 ><template #default="{ row }"
                   ><el-button
                     text
                     type="primary"
                     @click="viewPatient(row)"
-                    >档案详情</el-button
+                    >档案详情</el-button><el-button v-if="canAnalyze" text type="primary" @click="newForPatient(row)">新建检查</el-button
                   ><el-button
                     class="action-edit"
                     v-if="canAnalyze"
@@ -202,7 +202,7 @@
                 ></el-table-column
               ><template #empty
                 ><el-empty
-                  description="暂无档案，创建一份受检者档案开始" /></template></el-table
+                  :description="canAnalyze ? '暂无符合条件的档案，请重置搜索或新建档案' : '暂无可查看的档案，请联系检查人员创建'" /></template></el-table
             ><el-pagination
               class="pagination"
               layout="total, prev, pager, next"
@@ -249,12 +249,14 @@
               <div class="panel-heading">
                 <div>
                   <span class="step-number">01</span>
-                  <h2>检查与数据输入</h2>
+                  <h2>新建检查</h2>
                 </div>
-                <el-button v-if="activeStudy" text @click="resetWorkspace"
+                <el-button v-if="activeStudy" text :disabled="busy || analyzing" @click="newWorkspaceStudy"
                   >新建另一条</el-button
                 >
               </div>
+              <div class="workflow-progress" aria-label="检查步骤"><span :class="{done:studyForm.patient_id}">1 选择档案</span><span :class="{done:selectedFiles.length}">2 上传文件</span><span :class="{done:activeStudy}">3 校验预览</span><span :class="{done:latestAnalysis}">4 模型分析</span></div>
+              <el-alert :title="workspaceNext" :type="activeStudy ? 'success' : 'info'" :closable="false" class="workflow-next" data-testid="workspace-next" />
               <el-alert
                 v-if="!canAnalyze"
                 title="当前账号仅有复核权限，可在复核中心查看已有结果。"
@@ -264,7 +266,7 @@
               <el-form
                 label-position="top"
                 :disabled="!canAnalyze || !!activeStudy || busy"
-                ><el-form-item label="受检者档案"
+                ><el-form-item v-show="!studyForm.patient_id || editingWorkspaceInfo" label="① 选择受检者档案"
                   ><el-select
                     v-model="studyForm.patient_id"
                     filterable
@@ -284,39 +286,17 @@
                   >
                     先创建受检者档案 →
                   </button></el-form-item
-                ><el-form-item label="检查名称"
+                ><el-form-item v-show="!studyForm.patient_id || editingWorkspaceInfo" label="检查名称"
                   ><el-input
                     v-model="studyForm.title"
                     placeholder="例如：常规静息心电检查"
                     maxlength="150"
                     data-testid="workspace-title"
                 /></el-form-item>
-                <el-form-item
-                  v-if="page === 'signal'"
-                  label="输入波形的处理状态"
-                  ><el-select v-model="inputProfile" class="full"
-                    ><el-option
-                      label="实验处理版：已完成40 Hz低通，物理mV"
-                      value="filtered_mv" /><el-option
-                      label="原始波形：由系统进行40 Hz低通"
-                      value="raw_mv" /></el-select
-                ></el-form-item>
-                <UploadGuide :kind="page" :files="selectedFiles" @sample="files => { if(!busy && !activeStudy){selectedFiles=files;inputProfile='filtered_mv';} }" />
-                <div v-if="page === 'signal' && (!selectedFiles.length || selectedFiles.some(f => f.name.toLowerCase().endsWith('.csv')))" class="two-fields">
-                  <el-form-item label="CSV采样率"
-                    ><el-input-number
-                      v-model="samplingRate"
-                      :min="100"
-                      :max="100"
-                      controls-position="right" /></el-form-item
-                  ><el-form-item label="CSV数值单位"
-                    ><el-select v-model="inputUnit"
-                      ><el-option label="mV" value="mV" /><el-option
-                        label="μV"
-                        value="uV" /></el-select
-                  ></el-form-item>
-                </div> </el-form
-              ><label
+                <div v-if="studyForm.patient_id && !editingWorkspaceInfo" class="workspace-selection-summary" data-testid="workspace-selection-summary"><strong>{{patientOptions.find((p:any)=>p.id===studyForm.patient_id)?.name}} · {{patientOptions.find((p:any)=>p.id===studyForm.patient_id)?.code}}</strong><span>{{studyForm.title}}</span><div><el-button text @click="editingWorkspaceInfo=true" :disabled="!!activeStudy">修改档案/名称</el-button><el-button text @click="go('studies',{patient_id:String(studyForm.patient_id)})" data-testid="patient-history">历史检查 →</el-button></div></div>
+<el-button v-if="studyForm.patient_id && editingWorkspaceInfo" @click="editingWorkspaceInfo=false" class="full" style="margin-bottom:12px">确认信息，继续上传 →</el-button>
+<div class="input-step-heading" data-testid="upload-step"><strong>② 上传本次检查文件</strong><span>档案选择不会自动载入历史数据</span></div>
+<label
                 class="upload-zone"
                   @dragover.prevent="dragging=true" @dragleave.prevent="dragging=false" @drop.prevent="dropFiles"
                 :class="{ disabled: !canAnalyze || !!activeStudy, dragging }"
@@ -343,6 +323,30 @@
                 }}</span
                 ><small>单次总大小不超过16 MB</small></label
               >
+                <p class="workflow-hint" role="status">{{ selectedFiles.length ? (fileIssue ? '文件格式需修正，请查看下方提示。' : '文件已选择，请核对下方参数，再点击“保存并校验，查看预览”。') : '点击上方上传框选择文件，或在下方载入公开演示样例。' }}</p>
+                <el-button v-if="selectedFiles.length" text @click="selectedFiles=[]">清空所选文件</el-button>
+                <el-form-item
+                  v-if="page === 'signal' && selectedFiles.length > 0"
+                  label="文件参数：波形是否已滤波"
+                  ><el-select v-model="inputProfile" class="full"
+                    ><el-option
+                      label="实验处理版：已完成40 Hz低通，物理mV"
+                      value="filtered_mv" /><el-option
+                      label="原始波形：由系统进行40 Hz低通"
+                      value="raw_mv" /></el-select
+                ></el-form-item>
+                <UploadGuide :kind="page" :files="selectedFiles" @sample="files => { if(!busy && !activeStudy){selectedFiles=files;inputProfile='filtered_mv';} }" />
+                <div v-if="page === 'signal' && selectedFiles.length > 0 && (selectedFiles.some(f => f.name.toLowerCase().endsWith('.csv')))" class="two-fields">
+                  <el-form-item label="CSV采样率"
+                    ><el-input model-value="100 Hz（固定）" readonly aria-label="CSV采样率固定为100 Hz" /><small>当前模型仅支持100 Hz、10秒；不会自动重采样。</small></el-form-item
+                  ><el-form-item label="CSV数值单位"
+                    ><el-select v-model="inputUnit"
+                      ><el-option label="mV" value="mV" /><el-option
+                        label="μV"
+                        value="uV" /></el-select
+                  ></el-form-item>
+                </div> </el-form
+              >
               <el-alert v-if="fileIssue" :title="fileIssue" type="warning" :closable="false" />
               <div v-if="transferState" role="status" aria-live="polite"><p>{{transferState}}</p><el-progress :percentage="uploadPercent" /></div>
               <div class="file-chips">
@@ -360,15 +364,15 @@
                 class="full upload-submit"
                 type="primary"
                 :disabled="
-                  !canAnalyze || !selectedFiles.length || !!activeStudy
+                  !canAnalyze || !studyForm.patient_id || !studyForm.title.trim() || !selectedFiles.length || !!fileIssue || !!activeStudy
                 "
                 :loading="busy"
                 @click="submitInput"
                 data-testid="upload-submit"
-                >保存检查并校验数据</el-button
+                >③ 保存并校验，查看预览</el-button
               >
               <div v-if="activeStudy" class="validation-success">
-                <el-icon><CircleCheckFilled /></el-icon> 数据校验通过 · ECG-{{
+                <el-icon><CircleCheckFilled /></el-icon> 校验通过，请在右侧核对预览并点击“开始分析” · ECG-{{
                   pad(activeStudy.id)
                 }}
               </div>
@@ -440,7 +444,7 @@
                         : "报告图将在这里呈现"
                     }}
                   </h3>
-                  <p>选择档案并上传文件后，先检查输入内容。</p>
+                  <p>{{ workspaceNext }}</p>
                 </div>
               </section>
               <section class="panel result-panel">
@@ -566,8 +570,8 @@
             <div class="heading-actions">
               <el-button
                 class="action-export"
-                @click="download('/exports/studies.csv', '心电检查记录.csv')"
-                ><el-icon><Download /></el-icon> 导出清单</el-button
+                @click="exportFilteredStudies"
+                ><el-icon><Download /></el-icon> 导出当前筛选清单</el-button
               ><el-button
                 v-if="canAnalyze"
                 type="primary"
@@ -623,7 +627,7 @@
                 >加入批量任务（{{ selectedStudies.length }}）</el-button
               >
             </div>
-            <div v-if="patientFilter" class="filter-note">
+            <p v-if="canAnalyze" class="muted">批量分析：勾选已校验的待分析或失败记录后，点击“加入批量任务”。其他状态不可勾选。</p><div v-if="patientFilter" class="filter-note">
               已按受检者筛选
               <el-button
                 text
@@ -761,7 +765,7 @@
             <p class="muted">进度包含成功与失败项，100% 表示处理完毕；请同时查看失败数量。</p><el-checkbox v-model="failedJobs[job.id]">只看失败项</el-checkbox>
             <el-collapse
               ><el-collapse-item title="查看任务明细" :name="job.id"
-                ><el-table :data="failedJobs[job.id] ? job.items.filter((i:any)=>i.status==='failed') : job.items"
+                ><el-table :empty-text="failedJobs[job.id] ? '本任务没有失败项' : '暂无任务明细'" :data="failedJobs[job.id] ? job.items.filter((i:any)=>i.status==='failed') : job.items"
                   ><el-table-column label="检查" width="140"
                     ><template #default="{ row }"
                       ><el-button text @click="openStudy(row.study_id)"
@@ -781,9 +785,9 @@
             ></el-collapse>
           </section>
           <section v-if="!jobList.length" class="panel">
-            <el-empty description="暂无批量任务"
+            <el-empty description="暂无批量任务。请到检查记录勾选已校验的待分析或失败检查，再点击“加入批量任务”。"
               ><el-button @click="go('studies')"
-                >前往检查记录创建</el-button
+                >前往检查记录，勾选待分析项</el-button
               ></el-empty
             >
           </section>
@@ -899,7 +903,7 @@
                       ><el-select
                         class="account-role-select"
                         :model-value="row.role"
-                        :disabled="row.id === user.id"
+                        :disabled="row.id === user.id" :title="row.id === user.id ? '当前登录账号不能停用或移除自己的管理员角色' : '修改账号权限前请确认影响'"
                         @change="(role: string) => updateRole(row, role)"
                         ><el-option
                           v-for="(v, k) in roleNames"
@@ -918,7 +922,7 @@
                       ><el-button
                         :class="row.active ? 'action-edit' : 'action-review'"
                         text
-                        :disabled="row.id === user.id"
+                        :disabled="row.id === user.id" :title="row.id === user.id ? '当前登录账号不能停用或移除自己的管理员角色' : '修改账号权限前请确认影响'"
                         @click="toggleUser(row)"
                         >{{ row.active ? "停用" : "启用" }}</el-button
                       ></template
@@ -1003,7 +1007,7 @@
       ></el-dialog
     >
     <el-dialog v-model="studyDialog" title="新建检查" width="500px"
-      ><el-form label-position="top"
+      ><p class="muted">本步骤只建立检查记录；创建后将进入所选分析页面继续上传和校验。</p><el-form label-position="top"
         ><el-form-item label="受检者档案"
           ><el-select v-model="studyForm.patient_id" filterable class="full"
             ><el-option
@@ -1026,13 +1030,13 @@
       ><template #footer
         ><el-button @click="studyDialog = false">取消</el-button
         ><el-button type="primary" @click="createEmptyStudy" :loading="busy"
-          >创建并上传数据</el-button
+          >创建检查，继续上传</el-button
         ></template
       ></el-dialog
     >
     <el-drawer v-model="patientDrawer" title="受检者档案与检查历史" size="min(650px,100vw)">
       <template v-if="patientProfile"><h2>{{patientProfile.name}}</h2><p>{{patientProfile.code}} · {{sexNames[patientProfile.sex]}} · {{patientProfile.age ?? '年龄未填写'}}</p><p>{{patientProfile.note || '暂无备注'}}</p><el-divider />
-      <h3>最近十次检查</h3><el-table :data="patientHistory"><el-table-column prop="title" label="检查"/><el-table-column label="状态"><template #default="{row}">{{statusNames[row.status]}}</template></el-table-column><el-table-column label="日期"><template #default="{row}">{{date(row.created_at)}}</template></el-table-column><el-table-column label="详情"><template #default="{row}"><el-button text @click="openStudy(row.id)">查看</el-button></template></el-table-column></el-table><el-button @click="patientDrawer=false;viewPatientStudies(patientProfile)">查看全部检查</el-button></template>
+      <h3>最近十次检查</h3><el-table :data="patientHistory" empty-text="暂无检查，可关闭详情后点击该受检者的“新建检查”"><el-table-column prop="title" label="检查"/><el-table-column label="状态"><template #default="{row}">{{statusNames[row.status]}}</template></el-table-column><el-table-column label="日期"><template #default="{row}">{{date(row.created_at)}}</template></el-table-column><el-table-column label="详情"><template #default="{row}"><el-button text @click="openStudy(row.id)">查看</el-button></template></el-table-column></el-table><el-button @click="patientDrawer=false;viewPatientStudies(patientProfile)">查看全部检查</el-button></template>
     </el-drawer>
     <el-drawer
       v-model="detailDrawer"
@@ -1046,9 +1050,9 @@
         :class="'detail-kind-' + detail.kind"
       >
         <div v-if="canReview" class="toolbar wrap">
-          <el-button :disabled="!reviewNeighbors.previous" @click="openStudy(reviewNeighbors.previous)">上一条待复核</el-button>
+          <el-button :disabled="!reviewNeighbors.previous" @click="openStudy(reviewNeighbors.previous)" :title="reviewNeighbors.previous ? '打开上一条' : '没有上一条待复核检查'">上一条待复核</el-button>
           <span>剩余 {{ reviewNeighbors.remaining || 0 }} 条待复核</span>
-          <el-button :disabled="!reviewNeighbors.next" @click="openStudy(reviewNeighbors.next)">下一条待复核</el-button>
+          <el-button :disabled="!reviewNeighbors.next" @click="openStudy(reviewNeighbors.next)" :title="reviewNeighbors.next ? '打开下一条' : '没有下一条待复核检查'">下一条待复核</el-button>
         </div>
         <section class="detail-card detail-info-card">
           <div class="detail-hero">
@@ -1136,7 +1140,7 @@
           <el-button
             v-if="canAnalyze && detail.status === 'awaiting_upload'"
             @click="continueUpload"
-            >前往上传</el-button
+            >继续上传本条检查</el-button
           >
           <el-button @click="openStudy(detail.id)">刷新状态</el-button>
         </div>
@@ -1232,7 +1236,7 @@
           </el-collapse>
           <div class="result-actions">
             <el-button class="action-export" @click="downloadReport(a.id)"
-              >导出分析报告</el-button
+              >导出 PDF 报告</el-button
             >
             <el-button
               class="action-review"
@@ -1573,6 +1577,26 @@ function go(key: string, query: Record<string, string> = {}) {
 function openDocs() {
   window.open("/docs", "_blank", "noopener");
 }
+const workspaceNext = computed(() => {
+ if (latestAnalysis.value) return '分析已完成。请查看结果，并由专业人员复核；可导出PDF报告。';
+ if (activeStudy.value) return '下一步：核对右侧数据预览，确认无误后点击“开始分析”。';
+ if (!studyForm.patient_id) return '第1步：选择受检者档案。本页用于新建检查，历史数据请到检查记录查看。';
+ if (!selectedFiles.value.length) return '第2步：档案已选择，请上传本次检查文件，或载入公开演示样例。';
+ if (fileIssue.value) return '文件需要修正：' + fileIssue.value;
+ if (!studyForm.title.trim()) return '请填写检查名称，再保存并校验。';
+ return '第3步：核对文件参数，点击“保存并校验，查看预览”。校验后才会显示信号波形。';
+});
+const editingWorkspaceInfo = ref(false);
+watch(() => studyForm.patient_id, async () => {
+ if (!activeStudy.value) draftId.value = null;
+ editingWorkspaceInfo.value = false;
+ await nextTick();
+ const zone=document.querySelector('[data-testid="upload-step"]');
+ if (zone && studyForm.patient_id) {
+  const rect=zone.getBoundingClientRect();
+  if(rect.top<80 || rect.bottom>window.innerHeight-180) zone.scrollIntoView({behavior:'smooth',block:'center'});
+ }
+}, { flush: 'sync' });
 async function guarded(fn: () => Promise<void>) {
   busy.value = true;
   try {
@@ -1625,6 +1649,10 @@ async function resetFilters() {
  search.value="";filterSource.value="";filterKind.value="";filterStatus.value="";patientFilter.value=null;dateRange.value=null;listPage.value=1;
  await loadStudies();
 }
+function studyFilterParams() {
+ return {q:search.value,source:filterSource.value,kind:filterKind.value,status:page.value==='review'?'awaiting_review':filterStatus.value,patient_id:patientFilter.value||undefined,date_from:dateRange.value?.[0].toISOString(),date_to:dateRange.value?new Date(dateRange.value[1].getTime()+86400000-1).toISOString():undefined};
+}
+async function exportFilteredStudies(){ await download('/exports/studies.csv','心电检查记录.csv',studyFilterParams()); }
 async function loadStudies() {
   const query: Record<string,string> = {};
   if(filterSource.value)query.source=filterSource.value;
@@ -1747,6 +1775,8 @@ async function savePatient() {
   });
 }
 async function removePatient(row: any) {
+  const linked=await get('/studies',{patient_id:row.id,page_size:1});
+  if(linked.total){ElMessage.warning('该档案已有检查，不能删除。请先查看历史检查。');return;}
   try {
     await ElMessageBox.confirm(
       "仅能删除没有关联检查的档案，确认删除？",
@@ -1754,11 +1784,16 @@ async function removePatient(row: any) {
       { type: "warning" },
     );
     await api.delete(`/patients/${row.id}`);
+    ElMessage.success("档案已删除");
     await loadPatients();
   } catch {}
 }
 async function viewPatient(row:any){
  patientProfile.value=row;const r=await get('/studies',{patient_id:row.id,page_size:10});patientHistory.value=r.items;patientDrawer.value=true;
+}
+function newForPatient(row:any){
+ newWorkspaceStudy();studyForm.patient_id=row.id;go('signal');
+ ElMessage.info('已选择受检者，请上传本次检查数据；如需报告图，请选择报告图分析。');
 }
 function viewPatientStudies(row: any) {
   go("studies", {patient_id:String(row.id)});
@@ -1773,6 +1808,7 @@ async function createEmptyStudy() {
     studyDialog.value = false;
     resetWorkspace();
     draftId.value = r.id;
+    await nextTick();
     go(studyForm.kind);
     ElMessage.success("检查已建立，请选择文件上传");
   });
@@ -1781,7 +1817,17 @@ watch(selectedFiles,files=>{if(localImage.value)URL.revokeObjectURL(localImage.v
 function filesChanged(e: Event) {
   selectedFiles.value = Array.from((e.target as HTMLInputElement).files || []);
 }
+function newWorkspaceStudy() {
+  resetWorkspace();
+  Object.assign(studyForm, { patient_id: null, title: page.value==='image'?'标准心电报告图检查':'常规静息心电检查', kind: page.value, note: '' });
+  inputProfile.value = 'filtered_mv';
+  inputUnit.value = 'mV';
+  samplingRate.value = 100;
+  selectedLeads.value = ['II'];
+  nextTick(() => document.querySelector('.input-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+}
 function resetWorkspace() {
+  editingWorkspaceInfo.value=false;
   transferState.value="";analysisPhase.value="";uploadPercent.value=0;
   activeStudy.value = null;
   latestAnalysis.value = null;
@@ -1944,7 +1990,7 @@ async function saveReview(continueNext = false) {
   });
 }
 async function downloadReport(id: number) {
-  await download(`/analyses/${id}/report`, `心电分析报告-${id}.html`);
+  await download(`/analyses/${id}/report`, `心电分析报告-${id}.pdf`);
 }
 async function queueSelected() {
   try {
@@ -1968,9 +2014,11 @@ async function retryJob(id: number) {
   await guarded(async () => {
     await post(`/jobs/${id}/retries`);
     await loadJobs();
+    ElMessage.success("已重新提交失败项，请查看任务进度");
   });
 }
 async function importSamples() {
+  try {await ElMessageBox.confirm('将导入公开演示档案和检查，分析需另行运行；已有相同演示记录不会重复创建。继续吗？','导入演示样本');}catch{return;}
   await guarded(async () => {
     await post("/samples/import");
     await loadPage();
@@ -2012,7 +2060,17 @@ async function changePassword() {
     ElMessage.success("密码已修改");
   });
 }
+function hasUnsavedWork(){return !!((selectedFiles.value.length&&!activeStudy.value)||patientDialog.value||studyDialog.value||(reviewDialog.value&&reviewForm.comment.trim()));}
+const removeLeaveGuard=router.beforeEach(async(to,from)=>{
+ if(to.path===from.path||!hasUnsavedWork())return true;
+ try{await ElMessageBox.confirm('有尚未保存的输入。离开会放弃本轮未保存内容，确认离开？','未保存内容',{confirmButtonText:'放弃并离开',cancelButtonText:'继续编辑',type:'warning'});
+ resetWorkspace();patientDialog.value=false;studyDialog.value=false;reviewDialog.value=false;return true;}catch{return false;}
+});
+function warnBeforeUnload(event:BeforeUnloadEvent){if(hasUnsavedWork()){event.preventDefault();event.returnValue='';}}
+onMounted(()=>window.addEventListener('beforeunload',warnBeforeUnload));
+onBeforeUnmount(()=>{removeLeaveGuard();window.removeEventListener('beforeunload',warnBeforeUnload);});
 watch(page, async (n, o) => {
+  if(['signal','image'].includes(n)&&['常规静息心电检查','标准心电报告图检查'].includes(studyForm.title))studyForm.title=n==='image'?'标准心电报告图检查':'常规静息心电检查';
   restoreFilters();
   selectedStudies.value = [];
   if (["signal", "image"].includes(o) && n !== o && activeStudy.value)

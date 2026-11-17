@@ -33,12 +33,19 @@ export async function get(path: string, params?: Record<string, unknown>) {
 export async function post(path: string, data?: unknown) {
   return (await api.post(path, data)).data.result;
 }
-export async function download(path: string, name: string) {
-  const response = await api.get(path, { responseType: "blob" });
+const downloads = new Set<string>();
+export async function download(path: string, name: string, params?: Record<string, unknown>) {
+  if (downloads.has(path)) { ElMessage.info("文件正在生成，请稍候"); return; }
+  downloads.add(path);
+  ElMessage.info("正在生成下载文件…");
+  try {
+  const response = await api.get(path, { responseType: "blob", params });
   const url = URL.createObjectURL(response.data);
   const a = document.createElement("a");
   a.href = url;
   a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+  ElMessage.success("文件已生成，已发起下载");
+  } finally { downloads.delete(path); }
 }

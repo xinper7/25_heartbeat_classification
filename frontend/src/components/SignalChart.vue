@@ -129,7 +129,9 @@ onMounted(() => {
   chart.on('datazoom',()=>{const option=chart?.getOption() as any;const z=option?.dataZoom?.[0];if(z)windowLabel.value=`${(z.start/10).toFixed(1)}—${(z.end/10).toFixed(1)} 秒`;});
   observer = new ResizeObserver(([entry]) => {
     if (!entry) return;
-    const { width, height } = entry.contentRect;
+    const width = Math.round(entry.contentRect.width);
+    const height = Math.round(entry.contentRect.height);
+    if (width <= 0 || height <= 0) return;
     if (width === observedWidth && height === observedHeight) return;
     observedWidth = width;
     observedHeight = height;
@@ -137,7 +139,7 @@ onMounted(() => {
     // Resize on the next frame to avoid changing layout during observer delivery.
     resizeFrame = requestAnimationFrame(() => {
       resizeFrame = undefined;
-      chart?.resize();
+      if (chart && !chart.isDisposed()) chart.resize({ width, height });
     });
   });
   observer.observe(host.value!);

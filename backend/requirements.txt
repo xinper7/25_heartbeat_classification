@@ -15,3 +15,6 @@ scipy==1.18.1
 pillow==12.3.0
 onnxruntime==1.31.1
 torch==2.13.0+cpu
+
+reportlab==4.4.4
+pypdf==7.1.0

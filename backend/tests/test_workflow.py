@@ -127,7 +127,14 @@ def test_real_signal_analysis_review_and_export(client, headers):
         == "archived"
     )
     report = client.get(f"/api/v1/analyses/{result['id']}/report", headers=auth)
-    assert "&lt;script&gt;" in report.text and "<script>alert" not in report.text
+    import io
+    from pypdf import PdfReader
+    assert report.headers['content-type']=='application/pdf'
+    reader=PdfReader(io.BytesIO(report.content))
+    text=''.join(p.extract_text() for p in reader.pages)
+    assert '<script>alert(1)</script> reviewed' in text
+    assert len(reader.attachments)==2
+    assert len(reader.pages)>=3
     assert (
         "text/csv"
         in client.get("/api/v1/exports/studies.csv", headers=auth).headers[

@@ -2,14 +2,14 @@
   <section class="agent-workspace">
     <div class="page-heading"><div><h1>心电工作助手</h1><p>询问上传要求、模型信息，或选择检查后读取结果、运行分析。</p></div><el-tag>本地 Qwen · LoRA</el-tag></div>
     <el-alert title="助手仅编排已有工具并展示其返回结果，分析结论需要专业复核。" type="info" :closable="false" />
-    <el-alert v-if="status" :title="`Agent：${status.ready ? (status.loaded ? '已加载' : '文件就绪，首次操作时加载') : '模型文件未就绪'}；适配器离线分类正确率 ${status.metrics?.accuracy == null ? '未测量' : (status.metrics.accuracy*100).toFixed(0)+'%'}（${status.metrics?.test_samples || 0} 条，非当前端到端成功率）；适配器 ${status.metrics?.adapter || '未标注'}。请核对工具后确认。`" type="warning" :closable="false" />
+    <el-alert v-if="status" :title="`Agent：${status.ready ? (status.loaded ? '已加载' : '正在预热') : (status.phase === 'loading' ? '正在加载，请稍候' : status.error || '模型尚未就绪')}；适配器离线分类正确率 ${status.metrics?.accuracy == null ? '未测量' : (status.metrics.accuracy*100).toFixed(0)+'%'}（${status.metrics?.test_samples || 0} 条，非当前端到端成功率）；适配器 ${status.metrics?.adapter || '未标注'}。请核对工具后确认。`" type="warning" :closable="false" />
     <div class="agent-controls">
-      <el-select v-model="studyId" placeholder="可选：选择检查记录" filterable clearable data-testid="agent-study">
+      <el-select v-model="studyId" placeholder="搜索检查编号、姓名或检查名称" filterable remote :remote-method="searchStudies" :loading="searchingStudies" :disabled="busy" clearable data-testid="agent-study">
         <el-option v-for="s in studies" :key="s.id" :value="s.id" :label="`#${s.id} · ${s.title} · ${s.kind === 'signal' ? '信号' : '图片'}`" />
       </el-select>
       <el-button @click="fresh" :disabled="busy">新建会话</el-button>
     </div>
-    <div class="agent-suggestions"><el-button v-for="q in suggestions" :key="q" @click="query = q" :disabled="busy" size="small">{{ q }}</el-button></div>
+    <p class="muted">① 搜索并选择检查（帮助和模型查询可跳过） → ② 输入需求并预览 → ③ 核对对象并确认执行。</p><div class="agent-suggestions"><el-button v-for="q in suggestions" :key="q" @click="query = q" :disabled="busy" size="small">{{ q }}</el-button></div>
     <div class="agent-thread" aria-live="polite" data-testid="agent-messages">
       <p v-if="!messages.length" class="muted">从“怎么上传文件”开始，或选择一条已有检查。会话保存在本机，刷新后可以继续。</p>
       <article v-for="(m, i) in messages" :key="i" :class="['agent-message',m.role]">
@@ -21,35 +21,46 @@
     </div>
     <section v-if="pending" class="agent-message">
       <h3>确认本轮操作</h3><p>工具：{{ pending.label }} · {{ pending.writes ? '可能保存分析结果' : '只读' }}</p>
-      <p>检查：{{ pending.study_id ? `#${pending.study_id} · ${pending.study_title}` : '未关联检查' }}</p><p>{{ pending.note }}</p>
+      <p>检查：{{ pending.study_id ? `#${pending.study_id} · ${pending.study_title}` : '未关联检查' }}</p><p>{{ pending.note }}</p><p v-if="pending.writes && !allowAnalysis" class="muted">要执行分析，请先勾选下方“允许本轮运行模型分析”。</p>
       <el-select v-model="correctTool" placeholder="工具选错了？手动修正" :disabled="busy"><el-option v-for="(v,k) in toolLabels" :key="k" :value="k" :label="v" /></el-select>
-      <div class="agent-actions"><el-button @click="pending=null">取消</el-button><el-button @click="send" :disabled="busy || !correctTool">重新预览</el-button><el-button type="primary" @click="execute" :loading="busy" :disabled="pending.writes && !allowAnalysis">确认执行</el-button></div>
+      <div class="agent-actions"><el-button @click="pending=null;correctTool='';allowAnalysis=false" :disabled="busy">取消</el-button><el-button @click="send" :disabled="busy || !correctTool">重新预览</el-button><el-button type="primary" @click="execute" :loading="busy" :disabled="pending.writes && !allowAnalysis">确认执行</el-button></div>
     </section>
     <el-form @submit.prevent="send" class="agent-composer">
       <el-input v-model="query" type="textarea" :rows="3" maxlength="1000" show-word-limit placeholder="例如：读取这条检查的结果；怎么准备CSV？" data-testid="agent-query" :disabled="busy" />
-      <div class="agent-actions"><el-checkbox v-model="allowAnalysis" :disabled="busy">允许本轮运行模型分析</el-checkbox><el-button type="primary" native-type="submit" :loading="busy" :disabled="!query.trim()" data-testid="agent-send">预览操作</el-button></div>
+      <div class="agent-actions"><el-checkbox v-model="allowAnalysis" :disabled="busy">允许本轮运行模型分析</el-checkbox><el-button type="primary" native-type="submit" :loading="busy" :disabled="!query.trim() || !status?.ready" data-testid="agent-send">预览操作</el-button></div>
       <small class="muted">每轮先预览工具和检查，再确认执行。会话只保存操作历史；工具只访问上方选中的检查，不会从聊天内容推断患者身份。</small>
     </el-form>
   </section>
 </template>
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
 import { api, get } from '../api';
 type Message = {role:string;content:string;tool_calls?:{name:string}[];elapsed_ms?:number};
 const key = `ecg-agent-${sessionStorage.getItem('ecg-token')?.slice(-16)}`;
 const sessionId=ref(sessionStorage.getItem(key)||'');
 const studyId=ref<number>(); const studies=ref<any[]>([]); const messages=ref<Message[]>([]);
 const query=ref(''); const busy=ref(false); const error=ref(''); const allowAnalysis=ref(false);
+const searchingStudies=ref(false); let searchVersion=0;
+async function searchStudies(q='') {
+ const version=++searchVersion;searchingStudies.value=true;
+ try {const data=await get('/studies',{q,page_size:100});if(version!==searchVersion)return;
+ const selected=studies.value.find(s=>s.id===studyId.value);
+ studies.value=data.items||[];
+ if(selected&&!studies.value.some(s=>s.id===selected.id))studies.value.unshift(selected);
+ }finally{if(version===searchVersion)searchingStudies.value=false;}
+}
 const status=ref<any>(null); const pending=ref<any>(null);const correctTool=ref('');
 const toolLabels:Record<string,string>={analyze_signal:'数字信号分析',analyze_image:'报告图分析',read_result:'读取已有结果',input_help:'上传格式说明',model_info:'模型版本信息'};
-watch([query,studyId],()=>{pending.value=null;correctTool.value='';});
+watch([query,studyId],()=>{pending.value=null;correctTool.value='';allowAnalysis.value=false;});
 const suggestions=['怎么上传文件','当前用什么模型','读取检查结果','分析数字心电信号','分析报告图片'];
-function fresh(){pending.value=null;correctTool.value='';sessionId.value='';messages.value=[];studyId.value=undefined;sessionStorage.removeItem(key);error.value='';}
-onMounted(async()=>{try {status.value=await get('/agent/status'); const data=await get('/studies',{page_size:100}); studies.value=data.items||data;
- if(sessionId.value){ const s=await get(`/agent/sessions/${sessionId.value}`);messages.value=s.messages;studyId.value=s.study_id||undefined;}
+function fresh(){allowAnalysis.value=false;query.value='';pending.value=null;correctTool.value='';sessionId.value='';messages.value=[];studyId.value=undefined;sessionStorage.removeItem(key);error.value='';}
+let statusTimer: ReturnType<typeof setInterval>;
+onBeforeUnmount(()=>clearInterval(statusTimer));
+onMounted(async()=>{statusTimer=setInterval(async()=>{try{status.value=await get('/agent/status');}catch{}},3000);try {status.value=await get('/agent/status'); await searchStudies();
+ if(sessionId.value){ const s=await get(`/agent/sessions/${sessionId.value}`);messages.value=s.messages;studyId.value=s.study_id||undefined;if(studyId.value&&!studies.value.some(x=>x.id===studyId.value)){try{studies.value.unshift(await get(`/studies/${studyId.value}`));}catch{studyId.value=undefined;}}}
 }catch{error.value='加载会话或检查列表失败，可新建会话后重试。';}});
 async function send(){
- if(busy.value||!query.value.trim())return;busy.value=true;error.value='';pending.value=null;
+ if(busy.value||!query.value.trim()||!status.value?.ready)return;busy.value=true;error.value='';pending.value=null;
  try{const {data}=await api.post('/agent/plan',{query:query.value,session_id:sessionId.value||null,study_id:studyId.value||null,selected_tool:correctTool.value||null},{timeout:120000});
  const r=data.result;if(r.clarification){error.value=r.clarification;return;}
  sessionId.value=r.session_id;sessionStorage.setItem(key,r.session_id);pending.value=r;

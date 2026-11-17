@@ -1,3 +1,4 @@
+from browser_support import launch_chromium
 """Exercise the running local MySQL application with real model inference and browser UI.
 
 Creates explicitly named acceptance records. Does not delete existing business records.
@@ -76,7 +77,8 @@ def browser_flow(playwright, name, engine, credentials):
     record = dict(browser=name, passed=False, steps=[], display_ms={}, errors=[])
     try:
         if name == "Chrome":
-            browser = engine.launch(channel="chrome", headless=True)
+            browser = launch_chromium(playwright)
+            record["browser"] = "Chromium family (installed Chrome/Edge or bundled Chromium)"
         else:
             browser = engine.launch(headless=True)
         record["version"] = browser.version
@@ -101,9 +103,14 @@ def browser_flow(playwright, name, engine, credentials):
                 "button", name=label, exact=True
             ).click()
             page.locator(".content > .el-loading-mask").wait_for(state="hidden")
+            if page.get_by_text("修改档案/名称",exact=True).is_visible():
+                page.get_by_text("修改档案/名称",exact=True).click()
             page.get_by_test_id("workspace-patient").click()
             page.get_by_role("option").first.click()
+            if not page.get_by_test_id("workspace-title").is_visible():
+                page.get_by_text("修改档案/名称",exact=True).click()
             page.get_by_test_id("workspace-title").fill(f"浏览器验收 · {name} · {kind}")
+            page.get_by_text("确认信息，继续上传 →",exact=True).click()
             names = (
                 ["report.png"] if kind == "image" else ["00009_lr.hea", "00009_lr.dat"]
             )
@@ -126,9 +133,10 @@ def browser_flow(playwright, name, engine, credentials):
             with page.expect_download() as download:
                 page.get_by_role("button", name="导出报告", exact=True).click()
             downloaded = download.value
-            report_path = OUT / f"{name.lower()}-{kind}-report.html"
+            report_path = OUT / f"{name.lower()}-{kind}-report.pdf"
             downloaded.save_as(str(report_path))
-            assert "心电分析报告" in report_path.read_text(encoding="utf-8")
+            from pypdf import PdfReader
+            assert "心电分析报告" in "".join(p.extract_text() for p in PdfReader(report_path).pages)
             page.get_by_role("button", name="填写复核意见", exact=True).click()
             page.get_by_test_id("review-comment").fill(
                 "自动化功能验证：确认意见保存、归档和导出流程。本条为演示数据。"

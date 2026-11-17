@@ -3,11 +3,12 @@ import concurrent.futures,json,os,sys,threading,uuid
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT/'backend'))
 import pymysql
-info=json.loads((ROOT/'runtime/mysql-local-admin.json').read_text())
+info=json.loads(Path(os.environ.get('QA_MYSQL_ADMIN_FILE',str(ROOT/'runtime/mysql-local-admin.json'))).read_text())
+port=int(os.environ.get('QA_MYSQL_PORT','3307'))
 schema='ecg_qa_'+uuid.uuid4().hex
-admin=pymysql.connect(host='127.0.0.1',port=3307,user='root',password=info['root_password'],autocommit=True)
+admin=pymysql.connect(host='127.0.0.1',port=port,user='root',password=info['root_password'],autocommit=True)
 with admin.cursor() as c:c.execute('CREATE DATABASE '+schema+' CHARACTER SET utf8mb4')
-os.environ['DATABASE_URL']=f"mysql+pymysql://root:{info['root_password']}@127.0.0.1:3307/{schema}?charset=utf8mb4"
+os.environ['DATABASE_URL']=f"mysql+pymysql://root:{info['root_password']}@127.0.0.1:{port}/{schema}?charset=utf8mb4"
 from app.db import Base,SessionLocal,engine
 from app import models,worker
 from app.models import User,Patient,Study,Job,JobItem,Analysis

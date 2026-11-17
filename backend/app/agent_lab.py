@@ -57,6 +57,25 @@ def local_model():
  model=PeftModel.from_pretrained(model,adapter).eval()
  return tok,model
 
+_warm_state = {"phase": "idle", "error": None}
+_warm_thread = None
+
+def start_warmup():
+ global _warm_thread
+ if _warm_thread and _warm_thread.is_alive(): return
+ def load():
+  with guard:
+   _warm_state.update(phase="loading", error=None)
+   try:
+    choose("上传CSV需要什么格式")
+    _warm_state.update(phase="ready")
+   except Exception:
+    log.exception("Agent warmup failed")
+    _warm_state.update(phase="failed", error="助手加载失败，请检查本地模型后重启服务")
+ _warm_thread = threading.Thread(target=load, name="agent-warmup", daemon=True)
+ _warm_thread.start()
+
+
 def choose(query):
  import torch
  tok,model=local_model()
@@ -149,7 +168,7 @@ def agent_status(user:User=Depends(current_user)):
   try:
    data=json.loads(path.read_text(encoding='utf-8')); metrics=dict(accuracy=data['finetuned']['accuracy'],test_samples=data['test_samples'],train_samples=data['train_samples'],scope='适配器离线分类评估，非当前端到端成功率',adapter=adapter_folder.relative_to(folder).as_posix(),source=path.relative_to(folder).as_posix())
   except (ValueError,KeyError): pass
- return dict(code=0,result=dict(base_ready=base,adapter_ready=adapter,loaded=local_model.cache_info().currsize>0,ready=base and adapter,metrics=metrics,scope='仅五类工具路由；确认后执行；不生成医学诊断'),msg='成功')
+ return dict(code=0,result=dict(base_ready=base,adapter_ready=adapter,loaded=local_model.cache_info().currsize>0,ready=base and adapter and _warm_state['phase']=='ready',phase=_warm_state['phase'],error=_warm_state['error'],metrics=metrics,scope='仅五类工具路由；确认后执行；不生成医学诊断'),msg='成功')
 
 @router.post('/plan')
 def plan(body:ChatIn,db=Depends(get_db),user:User=Depends(current_user)):
