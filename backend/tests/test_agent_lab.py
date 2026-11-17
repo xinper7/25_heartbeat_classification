@@ -87,3 +87,16 @@ def test_unknown_file_hash_not_marked_sample():
  assert source_for_hashes(['unknown']) is None
  assert packaged_hashes()
  assert source_for_hashes(next(iter(packaged_hashes())))['purpose']=='public_sample'
+
+
+def test_read_timeout_exhaustion(monkeypatch):
+ import pytest
+ from fastapi import HTTPException
+ monkeypatch.setattr(agent_lab.time,'sleep',lambda _:None)
+ attempts=[]
+ def timeout():
+  attempts.append(1)
+  raise TimeoutError('injected read timeout')
+ with pytest.raises(HTTPException) as error:agent_lab.read_with_retry(timeout)
+ assert error.value.status_code==503
+ assert len(attempts)==4

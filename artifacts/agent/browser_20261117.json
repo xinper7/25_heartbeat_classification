@@ -1,0 +1,27 @@
+{
+  "checks": [
+    {
+      "browser": "chrome",
+      "available": true,
+      "filters": true,
+      "reload": true,
+      "upload_guide": true,
+      "agent_confirmation": true,
+      "manual_correction": true,
+      "history": true,
+      "negation": true
+    },
+    {
+      "browser": "msedge",
+      "available": true,
+      "filters": true,
+      "reload": true,
+      "upload_guide": true,
+      "agent_confirmation": true,
+      "manual_correction": true,
+      "history": true,
+      "negation": true
+    }
+  ],
+  "errors": []
+}

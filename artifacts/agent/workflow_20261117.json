@@ -1,0 +1,39 @@
+{
+  "studies": [
+    {
+      "kind": "signal",
+      "study_id": 24,
+      "analysis_id": 12,
+      "tool": "analyze_signal",
+      "elapsed_ms": 82.88,
+      "route_http_ms": 7013.66,
+      "execute_http_ms": 99.12,
+      "full_http_ms": 7112.78
+    },
+    {
+      "kind": "image",
+      "study_id": 25,
+      "analysis_id": 13,
+      "tool": "analyze_image",
+      "elapsed_ms": 46.26,
+      "route_http_ms": 542.07,
+      "execute_http_ms": 55.88,
+      "full_http_ms": 597.96
+    }
+  ],
+  "source_filter": true,
+  "review": true,
+  "single_use_token": true,
+  "agent": {
+    "base_ready": true,
+    "adapter_ready": true,
+    "loaded": true,
+    "ready": true,
+    "metrics": {
+      "accuracy": 0.8333333333333334,
+      "test_samples": 30,
+      "train_samples": 200
+    },
+    "scope": "仅五类工具路由；确认后执行；不生成医学诊断"
+  }
+}

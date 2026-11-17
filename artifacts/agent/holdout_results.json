@@ -1,0 +1,316 @@
+{
+  "base": {
+    "accuracy": 0.16,
+    "rows": [
+      {
+        "query": "给这一段数字采样计算类别输出",
+        "expected": "A",
+        "predicted": "E",
+        "ms": 530.06
+      },
+      {
+        "query": "将选定的十二路电压序列送入分类器",
+        "expected": "A",
+        "predicted": "E",
+        "ms": 521.76
+      },
+      {
+        "query": "请启动当前dat记录的信号预测",
+        "expected": "A",
+        "predicted": "E",
+        "ms": 508.75
+      },
+      {
+        "query": "对本条多导联时序数据做一次推断",
+        "expected": "A",
+        "predicted": "E",
+        "ms": 507.85
+      },
+      {
+        "query": "我要给这段ECG数值运行分类",
+        "expected": "A",
+        "predicted": "E",
+        "ms": 506.41
+      },
+      {
+        "query": "把这幅纸质心电扫描件交给图像网络",
+        "expected": "B",
+        "predicted": "E",
+        "ms": 537.97
+      },
+      {
+        "query": "请分类当前的报告截图",
+        "expected": "B",
+        "predicted": "E",
+        "ms": 666.41
+      },
+      {
+        "query": "启动选定心电照片的识别任务",
+        "expected": "B",
+        "predicted": "E",
+        "ms": 560.58
+      },
+      {
+        "query": "为这张标准排版心电图片计算标签",
+        "expected": "B",
+        "predicted": "E",
+        "ms": 672.17
+      },
+      {
+        "query": "我要对这幅报告影像做模型推断",
+        "expected": "B",
+        "predicted": "E",
+        "ms": 587.52
+      },
+      {
+        "query": "不要重算，展示上次存下的预测分数",
+        "expected": "C",
+        "predicted": "E",
+        "ms": 620.12
+      },
+      {
+        "query": "把已完成记录的分类输出调出来",
+        "expected": "C",
+        "predicted": "E",
+        "ms": 645.47
+      },
+      {
+        "query": "我只想查当前检查已经保存的标签",
+        "expected": "C",
+        "predicted": "E",
+        "ms": 487.87
+      },
+      {
+        "query": "此前那次推断的结果能列出来吗",
+        "expected": "C",
+        "predicted": "E",
+        "ms": 469.68
+      },
+      {
+        "query": "打开这份记录现有的分析结论",
+        "expected": "C",
+        "predicted": "E",
+        "ms": 450.5
+      },
+      {
+        "query": "提交表格之前导联标题应如何命名",
+        "expected": "D",
+        "predicted": "E",
+        "ms": 438.51
+      },
+      {
+        "query": "请解释上传时两个配对文件的作用",
+        "expected": "D",
+        "predicted": "E",
+        "ms": 438.57
+      },
+      {
+        "query": "输入心电文件的长度和频率有什么限制",
+        "expected": "D",
+        "predicted": "E",
+        "ms": 465.86
+      },
+      {
+        "query": "上传报告扫描件时需要哪种版式",
+        "expected": "D",
+        "predicted": "E",
+        "ms": 451.17
+      },
+      {
+        "query": "怎样填写CSV幅值的计量单位",
+        "expected": "D",
+        "predicted": "E",
+        "ms": 452.88
+      },
+      {
+        "query": "目前服务器上的分类网络版本号是多少",
+        "expected": "E",
+        "predicted": "E",
+        "ms": 435.12
+      },
+      {
+        "query": "请列出两种已部署分类器的输入规格",
+        "expected": "E",
+        "predicted": "A",
+        "ms": 464.04
+      },
+      {
+        "query": "我想了解本项目预测模型的结构名称",
+        "expected": "E",
+        "predicted": "E",
+        "ms": 448.01
+      },
+      {
+        "query": "发布的分类器使用了哪些判定阈值",
+        "expected": "E",
+        "predicted": "E",
+        "ms": 455.05
+      },
+      {
+        "query": "显示现有推理模型的版本清单",
+        "expected": "E",
+        "predicted": "E",
+        "ms": 480.13
+      }
+    ]
+  },
+  "lora": {
+    "accuracy": 0.96,
+    "rows": [
+      {
+        "query": "给这一段数字采样计算类别输出",
+        "expected": "A",
+        "predicted": "A",
+        "ms": 465.67
+      },
+      {
+        "query": "将选定的十二路电压序列送入分类器",
+        "expected": "A",
+        "predicted": "A",
+        "ms": 570.03
+      },
+      {
+        "query": "请启动当前dat记录的信号预测",
+        "expected": "A",
+        "predicted": "A",
+        "ms": 545.99
+      },
+      {
+        "query": "对本条多导联时序数据做一次推断",
+        "expected": "A",
+        "predicted": "A",
+        "ms": 557.16
+      },
+      {
+        "query": "我要给这段ECG数值运行分类",
+        "expected": "A",
+        "predicted": "A",
+        "ms": 508.56
+      },
+      {
+        "query": "把这幅纸质心电扫描件交给图像网络",
+        "expected": "B",
+        "predicted": "B",
+        "ms": 480.38
+      },
+      {
+        "query": "请分类当前的报告截图",
+        "expected": "B",
+        "predicted": "B",
+        "ms": 526.11
+      },
+      {
+        "query": "启动选定心电照片的识别任务",
+        "expected": "B",
+        "predicted": "B",
+        "ms": 513.26
+      },
+      {
+        "query": "为这张标准排版心电图片计算标签",
+        "expected": "B",
+        "predicted": "B",
+        "ms": 487.51
+      },
+      {
+        "query": "我要对这幅报告影像做模型推断",
+        "expected": "B",
+        "predicted": "B",
+        "ms": 514.06
+      },
+      {
+        "query": "不要重算，展示上次存下的预测分数",
+        "expected": "C",
+        "predicted": "C",
+        "ms": 505.26
+      },
+      {
+        "query": "把已完成记录的分类输出调出来",
+        "expected": "C",
+        "predicted": "C",
+        "ms": 546.73
+      },
+      {
+        "query": "我只想查当前检查已经保存的标签",
+        "expected": "C",
+        "predicted": "C",
+        "ms": 471.57
+      },
+      {
+        "query": "此前那次推断的结果能列出来吗",
+        "expected": "C",
+        "predicted": "C",
+        "ms": 482.37
+      },
+      {
+        "query": "打开这份记录现有的分析结论",
+        "expected": "C",
+        "predicted": "C",
+        "ms": 519.48
+      },
+      {
+        "query": "提交表格之前导联标题应如何命名",
+        "expected": "D",
+        "predicted": "D",
+        "ms": 526.28
+      },
+      {
+        "query": "请解释上传时两个配对文件的作用",
+        "expected": "D",
+        "predicted": "D",
+        "ms": 512.48
+      },
+      {
+        "query": "输入心电文件的长度和频率有什么限制",
+        "expected": "D",
+        "predicted": "D",
+        "ms": 544.73
+      },
+      {
+        "query": "上传报告扫描件时需要哪种版式",
+        "expected": "D",
+        "predicted": "D",
+        "ms": 481.42
+      },
+      {
+        "query": "怎样填写CSV幅值的计量单位",
+        "expected": "D",
+        "predicted": "D",
+        "ms": 543.58
+      },
+      {
+        "query": "目前服务器上的分类网络版本号是多少",
+        "expected": "E",
+        "predicted": "E",
+        "ms": 471.91
+      },
+      {
+        "query": "请列出两种已部署分类器的输入规格",
+        "expected": "E",
+        "predicted": "D",
+        "ms": 464.64
+      },
+      {
+        "query": "我想了解本项目预测模型的结构名称",
+        "expected": "E",
+        "predicted": "E",
+        "ms": 503.41
+      },
+      {
+        "query": "发布的分类器使用了哪些判定阈值",
+        "expected": "E",
+        "predicted": "E",
+        "ms": 565.97
+      },
+      {
+        "query": "显示现有推理模型的版本清单",
+        "expected": "E",
+        "predicted": "E",
+        "ms": 489.31
+      }
+    ]
+  },
+  "test_sha256": "ea498a1e8a9949732c8729438616898c194f9c81fcd140ecc1b97656b584c593",
+  "samples": 25,
+  "exact_overlap": 0,
+  "limitations": "人工新增小样本留出集；仅检查完全重复，未证明语义独立；不得据此调参再声称盲测。"
+}

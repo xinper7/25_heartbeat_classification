@@ -1,0 +1,376 @@
+{
+  "v1": {
+    "samples": 30,
+    "accuracy": 0.6666666666666666,
+    "original10_accuracy": 0.6,
+    "rows": [
+      {
+        "query": "请对已选择记录做数字信号分类",
+        "expected": "A",
+        "predicted": "A",
+        "ms": 452.44
+      },
+      {
+        "query": "运行这份12导联波形的推理",
+        "expected": "A",
+        "predicted": "B",
+        "ms": 475.64
+      },
+      {
+        "query": "请识别选中的心电报告照片",
+        "expected": "B",
+        "predicted": "B",
+        "ms": 448.57
+      },
+      {
+        "query": "用图像模型处理这张报告",
+        "expected": "B",
+        "predicted": "B",
+        "ms": 406.87
+      },
+      {
+        "query": "这份检查已经分析好了，帮我看预测",
+        "expected": "C",
+        "predicted": "E",
+        "ms": 388.45
+      },
+      {
+        "query": "请读取这条检查的五类结果",
+        "expected": "C",
+        "predicted": "E",
+        "ms": 392.25
+      },
+      {
+        "query": "我要准备上传，数据格式有何限制",
+        "expected": "D",
+        "predicted": "D",
+        "ms": 420.36
+      },
+      {
+        "query": "心电文件要如何提交",
+        "expected": "D",
+        "predicted": "D",
+        "ms": 391.05
+      },
+      {
+        "query": "请告诉我部署模型的版本信息",
+        "expected": "E",
+        "predicted": "E",
+        "ms": 419.76
+      },
+      {
+        "query": "两个推理模型的配置分别是什么",
+        "expected": "E",
+        "predicted": "A",
+        "ms": 382.79
+      },
+      {
+        "query": "给这条数字波形执行五类标签计算",
+        "expected": "A",
+        "predicted": "A",
+        "ms": 405.99
+      },
+      {
+        "query": "请用数字信号网络处理这个记录",
+        "expected": "A",
+        "predicted": "A",
+        "ms": 399.87
+      },
+      {
+        "query": "对CSV心电采样执行分类计算",
+        "expected": "A",
+        "predicted": "A",
+        "ms": 404.63
+      },
+      {
+        "query": "对当前十二导联运行信号模型",
+        "expected": "A",
+        "predicted": "A",
+        "ms": 396.63
+      },
+      {
+        "query": "请运行图片网络对报告进行分类",
+        "expected": "B",
+        "predicted": "B",
+        "ms": 399.58
+      },
+      {
+        "query": "给这张心电截图做图像推理",
+        "expected": "B",
+        "predicted": "B",
+        "ms": 399.23
+      },
+      {
+        "query": "识别报告扫描图里的分类标签",
+        "expected": "B",
+        "predicted": "B",
+        "ms": 399.67
+      },
+      {
+        "query": "对所选PNG报告执行模型分析",
+        "expected": "B",
+        "predicted": "B",
+        "ms": 391.34
+      },
+      {
+        "query": "打开已经生成的心电分析分数",
+        "expected": "C",
+        "predicted": "C",
+        "ms": 372.45
+      },
+      {
+        "query": "把这条检查已保存的预测列出来",
+        "expected": "C",
+        "predicted": "E",
+        "ms": 379.96
+      },
+      {
+        "query": "查看刚才保存的分类标签",
+        "expected": "C",
+        "predicted": "C",
+        "ms": 382.67
+      },
+      {
+        "query": "读取之前计算好的模型输出",
+        "expected": "C",
+        "predicted": "E",
+        "ms": 377.95
+      },
+      {
+        "query": "我上传的数据表列名怎么填写",
+        "expected": "D",
+        "predicted": "A",
+        "ms": 389.56
+      },
+      {
+        "query": "输入文件应该采用怎样的采样间隔",
+        "expected": "D",
+        "predicted": "A",
+        "ms": 377.74
+      },
+      {
+        "query": "成对的波形文件应该怎么传",
+        "expected": "D",
+        "predicted": "D",
+        "ms": 399.02
+      },
+      {
+        "query": "报告图片需要遵守什么布局",
+        "expected": "D",
+        "predicted": "B",
+        "ms": 348.24
+      },
+      {
+        "query": "本机发布了哪两个分类模型",
+        "expected": "E",
+        "predicted": "E",
+        "ms": 395.97
+      },
+      {
+        "query": "想看部署网络的输入尺寸和版本",
+        "expected": "E",
+        "predicted": "E",
+        "ms": 407.31
+      },
+      {
+        "query": "告诉我分类模型使用哪些阈值",
+        "expected": "E",
+        "predicted": "E",
+        "ms": 395.08
+      },
+      {
+        "query": "查看数字信号和图片模型的配置",
+        "expected": "E",
+        "predicted": "B",
+        "ms": 381.09
+      }
+    ]
+  },
+  "v2": {
+    "samples": 30,
+    "accuracy": 0.8333333333333334,
+    "original10_accuracy": 0.8,
+    "rows": [
+      {
+        "query": "请对已选择记录做数字信号分类",
+        "expected": "A",
+        "predicted": "A",
+        "ms": 398.61
+      },
+      {
+        "query": "运行这份12导联波形的推理",
+        "expected": "A",
+        "predicted": "A",
+        "ms": 393.85
+      },
+      {
+        "query": "请识别选中的心电报告照片",
+        "expected": "B",
+        "predicted": "B",
+        "ms": 370.65
+      },
+      {
+        "query": "用图像模型处理这张报告",
+        "expected": "B",
+        "predicted": "B",
+        "ms": 406.17
+      },
+      {
+        "query": "这份检查已经分析好了，帮我看预测",
+        "expected": "C",
+        "predicted": "B",
+        "ms": 431.38
+      },
+      {
+        "query": "请读取这条检查的五类结果",
+        "expected": "C",
+        "predicted": "C",
+        "ms": 402.88
+      },
+      {
+        "query": "我要准备上传，数据格式有何限制",
+        "expected": "D",
+        "predicted": "D",
+        "ms": 413.66
+      },
+      {
+        "query": "心电文件要如何提交",
+        "expected": "D",
+        "predicted": "C",
+        "ms": 395.47
+      },
+      {
+        "query": "请告诉我部署模型的版本信息",
+        "expected": "E",
+        "predicted": "E",
+        "ms": 427.1
+      },
+      {
+        "query": "两个推理模型的配置分别是什么",
+        "expected": "E",
+        "predicted": "E",
+        "ms": 413.32
+      },
+      {
+        "query": "给这条数字波形执行五类标签计算",
+        "expected": "A",
+        "predicted": "A",
+        "ms": 409.43
+      },
+      {
+        "query": "请用数字信号网络处理这个记录",
+        "expected": "A",
+        "predicted": "A",
+        "ms": 412.81
+      },
+      {
+        "query": "对CSV心电采样执行分类计算",
+        "expected": "A",
+        "predicted": "A",
+        "ms": 428.19
+      },
+      {
+        "query": "对当前十二导联运行信号模型",
+        "expected": "A",
+        "predicted": "A",
+        "ms": 405.51
+      },
+      {
+        "query": "请运行图片网络对报告进行分类",
+        "expected": "B",
+        "predicted": "B",
+        "ms": 384.73
+      },
+      {
+        "query": "给这张心电截图做图像推理",
+        "expected": "B",
+        "predicted": "B",
+        "ms": 424.73
+      },
+      {
+        "query": "识别报告扫描图里的分类标签",
+        "expected": "B",
+        "predicted": "B",
+        "ms": 421.68
+      },
+      {
+        "query": "对所选PNG报告执行模型分析",
+        "expected": "B",
+        "predicted": "B",
+        "ms": 401.96
+      },
+      {
+        "query": "打开已经生成的心电分析分数",
+        "expected": "C",
+        "predicted": "C",
+        "ms": 387.0
+      },
+      {
+        "query": "把这条检查已保存的预测列出来",
+        "expected": "C",
+        "predicted": "C",
+        "ms": 414.57
+      },
+      {
+        "query": "查看刚才保存的分类标签",
+        "expected": "C",
+        "predicted": "C",
+        "ms": 410.65
+      },
+      {
+        "query": "读取之前计算好的模型输出",
+        "expected": "C",
+        "predicted": "B",
+        "ms": 586.3
+      },
+      {
+        "query": "我上传的数据表列名怎么填写",
+        "expected": "D",
+        "predicted": "D",
+        "ms": 457.47
+      },
+      {
+        "query": "输入文件应该采用怎样的采样间隔",
+        "expected": "D",
+        "predicted": "D",
+        "ms": 443.79
+      },
+      {
+        "query": "成对的波形文件应该怎么传",
+        "expected": "D",
+        "predicted": "D",
+        "ms": 452.85
+      },
+      {
+        "query": "报告图片需要遵守什么布局",
+        "expected": "D",
+        "predicted": "B",
+        "ms": 407.55
+      },
+      {
+        "query": "本机发布了哪两个分类模型",
+        "expected": "E",
+        "predicted": "E",
+        "ms": 395.09
+      },
+      {
+        "query": "想看部署网络的输入尺寸和版本",
+        "expected": "E",
+        "predicted": "E",
+        "ms": 400.64
+      },
+      {
+        "query": "告诉我分类模型使用哪些阈值",
+        "expected": "E",
+        "predicted": "E",
+        "ms": 364.56
+      },
+      {
+        "query": "查看数字信号和图片模型的配置",
+        "expected": "E",
+        "predicted": "C",
+        "ms": 377.51
+      }
+    ]
+  }
+}

@@ -1,0 +1,102 @@
+[
+  {
+    "query": "给这一段数字采样计算类别输出",
+    "expected": "A"
+  },
+  {
+    "query": "将选定的十二路电压序列送入分类器",
+    "expected": "A"
+  },
+  {
+    "query": "请启动当前dat记录的信号预测",
+    "expected": "A"
+  },
+  {
+    "query": "对本条多导联时序数据做一次推断",
+    "expected": "A"
+  },
+  {
+    "query": "我要给这段ECG数值运行分类",
+    "expected": "A"
+  },
+  {
+    "query": "把这幅纸质心电扫描件交给图像网络",
+    "expected": "B"
+  },
+  {
+    "query": "请分类当前的报告截图",
+    "expected": "B"
+  },
+  {
+    "query": "启动选定心电照片的识别任务",
+    "expected": "B"
+  },
+  {
+    "query": "为这张标准排版心电图片计算标签",
+    "expected": "B"
+  },
+  {
+    "query": "我要对这幅报告影像做模型推断",
+    "expected": "B"
+  },
+  {
+    "query": "不要重算，展示上次存下的预测分数",
+    "expected": "C"
+  },
+  {
+    "query": "把已完成记录的分类输出调出来",
+    "expected": "C"
+  },
+  {
+    "query": "我只想查当前检查已经保存的标签",
+    "expected": "C"
+  },
+  {
+    "query": "此前那次推断的结果能列出来吗",
+    "expected": "C"
+  },
+  {
+    "query": "打开这份记录现有的分析结论",
+    "expected": "C"
+  },
+  {
+    "query": "提交表格之前导联标题应如何命名",
+    "expected": "D"
+  },
+  {
+    "query": "请解释上传时两个配对文件的作用",
+    "expected": "D"
+  },
+  {
+    "query": "输入心电文件的长度和频率有什么限制",
+    "expected": "D"
+  },
+  {
+    "query": "上传报告扫描件时需要哪种版式",
+    "expected": "D"
+  },
+  {
+    "query": "怎样填写CSV幅值的计量单位",
+    "expected": "D"
+  },
+  {
+    "query": "目前服务器上的分类网络版本号是多少",
+    "expected": "E"
+  },
+  {
+    "query": "请列出两种已部署分类器的输入规格",
+    "expected": "E"
+  },
+  {
+    "query": "我想了解本项目预测模型的结构名称",
+    "expected": "E"
+  },
+  {
+    "query": "发布的分类器使用了哪些判定阈值",
+    "expected": "E"
+  },
+  {
+    "query": "显示现有推理模型的版本清单",
+    "expected": "E"
+  }
+]
