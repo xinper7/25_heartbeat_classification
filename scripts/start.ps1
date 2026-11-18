@@ -37,7 +37,7 @@ if ($localEnv -match '(?m)^DATABASE_URL=[^\r\n]*@127\.0\.0\.1:3307/' -and (Test-
         if ($LASTEXITCODE -ne 0) { throw 'Project MySQL could not start.' }
     }
 }
-if ($Build -or (-not $Dev -and -not (Test-Path -LiteralPath 'frontend\dist\index.html'))) {
+if ($Build -or -not $Dev) {
     Push-Location frontend
     try { & npm.cmd run build; if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' } } finally { Pop-Location }
 }

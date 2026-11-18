@@ -122,11 +122,11 @@ def test_background_warmup_success_and_failure(monkeypatch):
  from app import agent_lab as a
  monkeypatch.setattr(a,'_warm_thread',None)
  monkeypatch.setattr(a,'_warm_state',{'phase':'idle','error':None})
- monkeypatch.setattr(a,'choose',lambda q:'input_help')
+ monkeypatch.setattr(a,'predict_tool',lambda q:'input_help')
  a.start_warmup(); a._warm_thread.join(timeout=2)
  assert a._warm_state['phase']=='ready'
  def fail(q): raise OSError('missing model')
- monkeypatch.setattr(a,'choose',fail)
+ monkeypatch.setattr(a,'predict_tool',fail)
  a.start_warmup(); a._warm_thread.join(timeout=2)
  assert a._warm_state['phase']=='failed'
  assert a._warm_state['error']
@@ -138,3 +138,17 @@ def test_followup_has_bounded_context_and_explicit_query_unchanged():
  q=a.routing_query('它怎么样了',history,SimpleNamespace(kind='signal'))
  assert 'read_result' in q and 'signal' in q
  assert a.routing_query('上传CSV要求',history,None)=='上传CSV要求'
+
+
+def test_explicit_read_intent_overrides_wrong_model(client, headers, monkeypatch):
+ from app import agent_lab as a
+ calls=[]
+ monkeypatch.setattr(a, 'predict_tool', lambda q: calls.append(q) or 'analyze_image')
+ response=client.post('/api/v1/agent/plan', headers=headers(), json={'query':'读取这条检查的分析结果'})
+ assert response.status_code==200
+ assert response.json()['result']['clarification']=='请先在上方选择检查记录。'
+ assert calls==[]
+ assert a.choose('查看当前模型的信息')=='model_info'
+ assert a.choose('告诉我怎么上传心电数据')=='input_help'
+ assert a.choose('最近操作：分析图片。当前请求：读取已有结果')=='read_result'
+ assert a.explicit_tool('不要读取结果') is None

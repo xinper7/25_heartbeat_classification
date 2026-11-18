@@ -1,8 +1,12 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
+import { execFileSync } from "node:child_process";
+let revision = "local";
+try { revision = execFileSync("git", ["rev-parse", "--short", "HEAD"], { encoding: "utf8" }).trim(); } catch { /* Source archives may omit Git metadata. */ }
 
 export default defineConfig({
   plugins: [vue()],
+  define: { __BUILD_REVISION__: JSON.stringify(revision) },
   server: {
     port: 5173,
     strictPort: true,

@@ -284,6 +284,15 @@ const metrics = computed(() => [
     tone: "amber",
   },
   {
+    label: "待补充",
+    filter: "pending_correction",
+    value: count("pending_correction"),
+    note: "复核退回，等待补充说明",
+    route: "studies",
+    icon: Document,
+    tone: "amber",
+  },
+  {
     label: "已归档",
     filter: "archived",
     value: count("archived"),
@@ -305,6 +314,7 @@ const distribution = computed(() => [
     color: "#7b8ee6",
   },
   { label: "等待复核", value: count("awaiting_review"), color: "#f1bb65" },
+  { label: "待补充", value: count("pending_correction"), color: "#db9a62" },
   { label: "已归档", value: count("archived"), color: "#42c9b4" },
   { label: "分析失败", value: count("failed"), color: "#ee8f98" },
 ]);

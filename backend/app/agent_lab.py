@@ -1,4 +1,5 @@
 """Local Qwen LoRA router + LangChain tool loop. No external patient-data calls."""
+import re
 import json, logging, sqlite3, threading, time, uuid
 from pathlib import Path
 from functools import lru_cache
@@ -53,7 +54,7 @@ def local_model():
   raise HTTPException(503,'本地LoRA模型尚未准备好，请先运行 scripts/lab5_train.py')
  torch.set_num_threads(4)
  tok=AutoTokenizer.from_pretrained(folder/'base',local_files_only=True)
- model=AutoModelForCausalLM.from_pretrained(folder/'base',local_files_only=True,torch_dtype=torch.float32)
+ model=AutoModelForCausalLM.from_pretrained(folder/'base',local_files_only=True,dtype=torch.float32)
  model=PeftModel.from_pretrained(model,adapter).eval()
  return tok,model
 
@@ -67,7 +68,7 @@ def start_warmup():
   with guard:
    _warm_state.update(phase="loading", error=None)
    try:
-    choose("上传CSV需要什么格式")
+    predict_tool("上传CSV需要什么格式")
     _warm_state.update(phase="ready")
    except Exception:
     log.exception("Agent warmup failed")
@@ -76,13 +77,30 @@ def start_warmup():
  _warm_thread.start()
 
 
+def explicit_tool(query):
+ # Earlier conversation provides context, not a new command.
+ current = query.rsplit('当前请求：', 1)[-1].strip()
+ if re.search(r'不要|不需要|不用|取消|停止|别', current):
+  return None
+ read = bool(re.search(r'读取|查看|显示|调出|查询|看看', current) and re.search(r'结果|结论|预测|分类输出', current))
+ help_request = bool(re.search(r'上传|文件|CSV|格式', current, re.I) and re.search(r'怎么|如何|要求|格式|说明', current))
+ model = bool(re.search(r'模型|分类器', current) and re.search(r'版本|信息|状态', current))
+ tools = [name for name, matched in [('read_result', read), ('input_help', help_request), ('model_info', model)] if matched]
+ return tools[0] if len(tools) == 1 else None
+
+
 def choose(query):
+ return explicit_tool(query) or predict_tool(query)
+
+
+@lru_cache(maxsize=128)
+def predict_tool(query):
  import torch
  tok,model=local_model()
  prompt=tok.apply_chat_template([{'role':'system','content':SYSTEM},{'role':'user','content':query}],tokenize=False,add_generation_prompt=True)
  batch=tok(prompt,return_tensors='pt',truncation=True,max_length=512)
  ids=[tok.encode(x,add_special_tokens=False)[0] for x in 'ABCDE']
- with torch.no_grad(): scores=model(**batch).logits[0,-1,ids]
+ with torch.inference_mode(): scores=model(**batch, use_cache=False, logits_to_keep=1).logits[0,-1,ids]
  return NAMES[scores.argmax().item()]
 
 class RouterModel(BaseChatModel):

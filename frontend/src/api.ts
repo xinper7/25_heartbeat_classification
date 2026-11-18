@@ -44,8 +44,11 @@ export async function download(path: string, name: string, params?: Record<strin
   const a = document.createElement("a");
   a.href = url;
   a.download = name;
+  document.body.appendChild(a);
   a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  a.remove();
+  // Let the browser consume large reports before releasing their blob URL.
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
   ElMessage.success("文件已生成，已发起下载");
   } finally { downloads.delete(path); }
 }

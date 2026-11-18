@@ -848,7 +848,7 @@
               <el-descriptions :column="1" border
                 ><el-descriptions-item label="运行设备"
                   >CPU ·
-                  {{ health.version ? "本地服务" : "" }}</el-descriptions-item
+                  {{ health.version ? "本地服务" : "" }} · 页面版本 {{ buildRevision }}</el-descriptions-item
                 ><el-descriptions-item label="输入形状">{{
                   model.input_shape.join(" × ")
                 }}</el-descriptions-item
@@ -1396,6 +1396,8 @@ const user = ref<any>(null),
   busy = ref(false),
   analyzing = ref(false),
   mobileNav = ref(false);
+declare const __BUILD_REVISION__: string;
+const buildRevision = __BUILD_REVISION__;
 const canAnalyze = computed(() =>
     ["analyst", "admin"].includes(user.value?.role),
   ),
