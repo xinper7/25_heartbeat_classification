@@ -27,6 +27,7 @@ def token_for(user):
     return jwt.encode(
         {
             "sub": str(user.id),
+            "ver": user.auth_version,
             "exp": datetime.now(timezone.utc) + timedelta(hours=cfg.token_hours),
         },
         cfg.jwt_secret,
@@ -49,6 +50,8 @@ def current_user(
         raise HTTPException(401, "登录已过期，请重新登录")
     if not user or not user.active:
         raise HTTPException(401, "账号不可用")
+    if payload.get("ver", 0) != user.auth_version:
+        raise HTTPException(401, "密码已更新，请重新登录")
     return user
 
 

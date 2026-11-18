@@ -152,3 +152,32 @@ def test_explicit_read_intent_overrides_wrong_model(client, headers, monkeypatch
  assert a.choose('告诉我怎么上传心电数据')=='input_help'
  assert a.choose('最近操作：分析图片。当前请求：读取已有结果')=='read_result'
  assert a.explicit_tool('不要读取结果') is None
+
+
+def test_compound_requests_are_clarified_before_routing(client, headers, monkeypatch):
+ def forbidden(query):
+  raise AssertionError('Compound requests must be clarified before choosing a tool')
+ monkeypatch.setattr(agent_lab, 'choose', forbidden)
+ for query in ['读取结果并查询模型版本', '查看结果并分析数字信号', '先读取结果再查询模型版本', '分析信号，然后读取结果', '读取结果和分析数字信号', '数字信号分析并查询模型版本']:
+  response=client.post('/api/v1/agent/plan', headers=headers(), json={'query':query})
+  assert response.status_code==200
+  assert '只选择一项' in response.json()['result']['clarification']
+
+
+def test_negated_analysis_allows_explicit_read_only_request(client, headers, monkeypatch):
+ def forbidden(query):
+  raise AssertionError('The explicit read request must not invoke the model')
+ monkeypatch.setattr(agent_lab, 'predict_tool', forbidden)
+ patient=client.post('/api/v1/patients',headers=headers(),json={'code':'NEGATED','name':'test'}).json()['result']
+ study=client.post('/api/v1/studies',headers=headers(),json={'patient_id':patient['id'],'title':'test','kind':'signal'}).json()['result']
+ for query in ['不要重新分析，只读取已有结果', '只读取结果，不要运行分析', '不用分析只查看已有结果']:
+  plan=client.post('/api/v1/agent/plan',headers=headers(),json={'query':query,'study_id':study['id']}).json()['result']
+  assert plan['tool']=='read_result' and not plan['writes']
+  result=client.post('/api/v1/agent/chat',headers=headers(),json={'query':query,'study_id':study['id'],'session_id':plan['session_id'],'plan_token':plan['token']})
+  assert result.status_code==200
+  assert [call['name'] for call in result.json()['result']['tool_calls']]==['read_result']
+  assert client.get(f"/api/v1/studies/{study['id']}",headers=headers()).json()['result']['analyses']==[]
+ denied=client.post('/api/v1/agent/plan',headers=headers(),json={'query':'不要分析，只读取结果','study_id':study['id'],'selected_tool':'analyze_signal'})
+ assert denied.status_code==400
+ allowed=client.post('/api/v1/agent/plan',headers=headers(),json={'query':'不要读取结果，运行数字信号分析','study_id':study['id'],'selected_tool':'analyze_signal'})
+ assert allowed.status_code==200 and allowed.json()['result']['tool']=='analyze_signal'

@@ -61,6 +61,8 @@ from .services import (
 )
 from .services import perform_analysis
 
+from .version import REVISION, STARTED_AT
+
 log = logging.getLogger("ecg")
 cfg = get_settings()
 DB = Annotated[Session, Depends(get_db)]
@@ -180,6 +182,8 @@ def health():
             database=database,
             models={k: k in engine.models for k in ("signal", "image")},
             version="1.0.0",
+            revision=REVISION,
+            started_at=STARTED_AT,
         ),
         status=200 if ready else 503,
     )
@@ -226,9 +230,14 @@ def me(user: Actor):
 
 @app.post("/api/v1/auth/password", tags=["auth"], response_model=ApiResponse)
 def password(body: PasswordIn, db: DB, user: Actor):
+    user = db.scalar(
+        select(User).where(User.id == user.id).with_for_update()
+        .execution_options(populate_existing=True)
+    )
     if not verify_password(body.current_password, user.password_hash):
         raise HTTPException(400, "当前密码不正确")
     user.password_hash = hasher.hash(body.new_password)
+    user.auth_version += 1
     audit(db, user, "auth.password_changed", "user:" + str(user.id))
     db.commit()
     return ok(msg="密码已更新")

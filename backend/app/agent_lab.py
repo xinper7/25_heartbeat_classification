@@ -77,20 +77,43 @@ def start_warmup():
  _warm_thread.start()
 
 
-def explicit_tool(query):
- # Earlier conversation provides context, not a new command.
+def request_intents(query):
  current = query.rsplit('当前请求：', 1)[-1].strip()
- if re.search(r'不要|不需要|不用|取消|停止|别', current):
-  return None
- read = bool(re.search(r'读取|查看|显示|调出|查询|看看', current) and re.search(r'结果|结论|预测|分类输出', current))
- help_request = bool(re.search(r'上传|文件|CSV|格式', current, re.I) and re.search(r'怎么|如何|要求|格式|说明', current))
- model = bool(re.search(r'模型|分类器', current) and re.search(r'版本|信息|状态', current))
- tools = [name for name, matched in [('read_result', read), ('input_help', help_request), ('model_info', model)] if matched]
- return tools[0] if len(tools) == 1 else None
+ clauses = re.split(r'[，,。；;]|并且|然后|之后|同时|接着|以及|而是|但是|并|[和与](?=读取|查看|查询|显示|分析|运行)|再帮(?:我)?|只(?=读取|查看|查询|显示)|再(?=查询|读取|分析|运行|查看)', current)
+ active = []
+ cancelled = False
+ for clause in clauses:
+  if re.search(r'不要|不需要|不用|无需|不必|不再|取消|停止|别', clause):
+   cancelled = True
+  elif clause.strip():
+   active.append(clause.strip())
+ actions = set()
+ for clause in active:
+  if re.search(r'读取|查看|显示|调出|查询|看看', clause) and re.search(r'结果|结论|预测|分类输出', clause):
+   actions.add('read_result')
+  if re.search(r'上传|文件|CSV|格式', clause, re.I) and re.search(r'怎么|如何|要求|格式|说明', clause):
+   actions.add('input_help')
+  if re.search(r'模型|分类器', clause) and re.search(r'版本|信息|状态', clause):
+   actions.add('model_info')
+  explicit_analysis = re.search(r'(运行|执行|启动|进行|重新|送入).{0,12}(分析|推理|识别|分类器)|^(?:请|帮我|请帮我|麻烦)?(?:分析|识别|推理)', clause)
+  input_analysis = (re.search(r'分析|推理|识别|分类器', clause)
+                    and re.search(r'信号|波形|图片|报告图|照片|电压序列', clause)
+                    and not re.search(r'结果|结论|预测|版本|信息|说明|格式|要求', clause))
+  if explicit_analysis or input_analysis:
+   actions.add('analysis')
+ return '，'.join(active), actions, cancelled
+
+
+def explicit_tool(query):
+ _, actions, _ = request_intents(query)
+ if len(actions) == 1 and 'analysis' not in actions:
+  return next(iter(actions))
+ return None
 
 
 def choose(query):
- return explicit_tool(query) or predict_tool(query)
+ active, _, cancelled = request_intents(query)
+ return explicit_tool(query) or predict_tool(active if cancelled else query)
 
 
 @lru_cache(maxsize=128)
@@ -150,18 +173,19 @@ def history(sid:str,user:User=Depends(current_user)):
 LABELS=dict(zip(NAMES,['数字信号分析','报告图分析','读取已有结果','上传格式说明','模型版本信息']))
 
 def clarify(query):
- import re
  if re.search(r'删除|停用|修改密码|创建账号|自动归档|自动复核|开药|处方',query):
   return '这项操作不在助手支持的五类工具内，请使用对应业务页面。'
- if re.search(r'(信号|波形|CSV|csv)',query) and re.search(r'图片|照片|PNG|JPEG',query) and re.search(r'分析|推理|识别',query):
-  return '请分两轮操作，每轮选择一条检查和一种输入类型。'
- if re.search(r'(不要|别|不需要|不用|停止|取消).{0,12}(分析|运行|推理|识别)',query):
-  return '已取消分析意图。请明确本轮是读取已有结果、查询模型，还是查看上传说明。'
- if re.search(r'(同时|然后|并且|再帮|再读|之后)',query) and sum(bool(re.search(x,query)) for x in ['分析|推理|识别','结果|结论','上传|格式','模型|版本'])>1:
+ active, actions, cancelled = request_intents(query)
+ if len(actions) > 1:
   return '本轮请只选择一项操作，完成后再提出下一项。'
+ if re.search(r'信号|波形|CSV',active,re.I) and re.search(r'图片|照片|PNG|JPEG',active,re.I) and re.search(r'分析|推理|识别',active):
+  return '请分两轮操作，每轮选择一条检查和一种输入类型。'
+ if cancelled and not actions:
+  return '已取消本轮操作。请明确本轮是读取已有结果、查询模型，还是查看上传说明。'
  if re.search(r'天气|股票|彩票|讲笑话|写诗',query):
   return '我支持心电检查的分析、结果读取、上传说明和模型信息。请明确需要哪一项。'
  return None
+
 
 def routing_query(query, messages, study):
  """Include bounded context for elliptical follow-ups; explicit requests stay unchanged."""
@@ -199,6 +223,8 @@ def plan(body:ChatIn,db=Depends(get_db),user:User=Depends(current_user)):
  hint=clarify(body.query)
  if hint:return dict(code=0,result=dict(clarification=hint),msg='需要澄清')
  if body.selected_tool and body.selected_tool not in NAMES:raise HTTPException(400,'不支持的工具')
+ _, actions, cancelled = request_intents(body.query)
+ if cancelled and 'analysis' not in actions and body.selected_tool in NAMES[:2]:raise HTTPException(400,'请按本轮明确保留的操作选择工具，或重新描述分析需求')
  if not guard.acquire(blocking=False):raise HTTPException(429,'助手正在处理其他请求，请稍后重试')
  try: name=body.selected_tool or choose(routing_query(body.query,json.loads(row[2]) if row else [],study))
  finally:guard.release()

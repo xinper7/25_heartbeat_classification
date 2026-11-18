@@ -848,7 +848,7 @@
               <el-descriptions :column="1" border
                 ><el-descriptions-item label="运行设备"
                   >CPU ·
-                  {{ health.version ? "本地服务" : "" }} · 页面版本 {{ buildRevision }}</el-descriptions-item
+                  后端版本 {{ health.revision || "旧服务，请重启" }} · 页面版本 {{ buildRevision }}</el-descriptions-item
                 ><el-descriptions-item label="输入形状">{{
                   model.input_shape.join(" × ")
                 }}</el-descriptions-item
@@ -2083,7 +2083,8 @@ async function changePassword() {
     passwordDialog.value = false;
     passwordForm.current_password = "";
     passwordForm.new_password = "";
-    ElMessage.success("密码已修改");
+    logout();
+    ElMessage.success("密码已修改，请使用新密码重新登录");
   });
 }
 function hasUnsavedWork(){return !!((selectedFiles.value.length&&!activeStudy.value)||patientDialog.value||studyDialog.value||(reviewDialog.value&&reviewForm.comment.trim()));}

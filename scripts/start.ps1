@@ -71,6 +71,11 @@ for ($attempt = 0; $attempt -lt 30; $attempt++) {
     Start-Sleep -Seconds 1
 }
 if (-not $ready) { throw 'Service did not become ready. See runtime/api.err.log. Use scripts/stop.ps1 before restarting.' }
+$expectedRevision = & git rev-parse --short HEAD 2>$null
+if ($expectedRevision -and $response.result.revision -ne $expectedRevision) {
+    throw 'The running backend revision differs from the checkout. Stop the old service and restart.'
+}
+Write-Host ("Backend revision: " + $response.result.revision)
 Write-Host "Application ready: $url"
 Write-Host 'API docs: http://127.0.0.1:8000/docs'
 Write-Host 'Login credentials: BOOTSTRAP_ADMIN_USERNAME / BOOTSTRAP_ADMIN_PASSWORD in local .env.'

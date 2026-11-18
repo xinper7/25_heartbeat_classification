@@ -370,13 +370,13 @@ def test_account_management_and_date_filters(client, headers):
         ).status_code
         == 200
     )
-    assert (
-        client.post(
-            "/api/v1/auth/login",
-            json=dict(username="admin", password="another-password-123!"),
-        ).status_code
-        == 200
+    login = client.post(
+        "/api/v1/auth/login",
+        json=dict(username="admin", password="another-password-123!"),
     )
+    assert login.status_code == 200
+    assert client.get("/api/v1/auth/me", headers=admin).status_code == 401
+    admin = {"Authorization": "Bearer " + login.json()["result"]["access_token"]}
     pid = create_patient(client, admin)
     create_study(client, admin, pid)
     assert (
