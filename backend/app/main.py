@@ -41,6 +41,7 @@ from .schemas import (
     LoginIn,
     PasswordIn,
     PatientIn,
+    ReviewAction,
     ReviewIn,
     StudyIn,
     UserIn,
@@ -550,23 +551,34 @@ def analyze(study_id: int, db: DB, user: Analyst):
     response_model=ApiResponse,
 )
 def review(analysis_id: int, body: ReviewIn, db: DB, user: Reviewer):
+    return save_review_action(db, user, analysis_id, body, body.conclusion)
+
+
+@app.post("/api/v1/analyses/{analysis_id}/resubmit", tags=["reviews"], response_model=ApiResponse)
+def resubmit(analysis_id: int, body: ReviewAction, db: DB, user: Analyst):
+    return save_review_action(db, user, analysis_id, body, "resubmitted")
+
+
+def save_review_action(db, user, analysis_id, body, action):
     analysis = db.get(Analysis, analysis_id)
     if not analysis:
         raise HTTPException(404, "分析记录不存在")
     study = access_study(db, analysis.study_id, user, lock=True)
-    latest = db.scalar(
-        select(Analysis.id)
-        .where(Analysis.study_id == study.id)
-        .order_by(Analysis.id.desc())
-        .limit(1)
-    )
-    if latest != analysis.id or study.status not in ("awaiting_review", "archived"):
-        raise HTTPException(409, "请复核当前最新且已完成的分析记录")
-    db.add(Review(analysis_id=analysis_id, reviewer_id=user.id, **body.model_dump()))
-    study.status = "archived"
-    audit(db, user, "review.completed", "analysis:" + str(analysis.id))
+    latest = db.scalar(select(Analysis.id).where(Analysis.study_id == study.id)
+                       .order_by(Analysis.id.desc()).limit(1).with_for_update())
+    previous = db.scalar(select(Review.id).where(Review.analysis_id == analysis_id)
+                         .order_by(Review.id.desc()).limit(1).with_for_update())
+    required = "pending_correction" if action == "resubmitted" else "awaiting_review"
+    if latest != analysis_id or study.status != required or previous != body.previous_event_id:
+        raise HTTPException(409, "检查状态或复核记录已更新，请刷新后重试")
+    comment = body.comment.strip()
+    if len(comment) < 5:
+        raise HTTPException(422, "请填写至少五个字符的说明")
+    db.add(Review(analysis_id=analysis_id, reviewer_id=user.id, conclusion=action, comment=comment))
+    study.status = {"returned": "pending_correction", "resubmitted": "awaiting_review"}.get(action, "archived")
+    audit(db, user, "review." + action, "analysis:" + str(analysis.id))
     db.commit()
-    return ok(serialize_analysis(db, analysis), "复核已保存并归档")
+    return ok(serialize_analysis(db, analysis), "操作已保存")
 
 
 @app.get("/api/v1/analyses/{analysis_id}/report", tags=["reports"])

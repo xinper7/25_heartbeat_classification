@@ -87,6 +87,7 @@ def serialize_analysis(db, analysis):
         else None,
         review_history=[
             dict(
+                id=r.id,
                 comment=r.comment,
                 conclusion=r.conclusion,
                 reviewer=db.get(User, r.reviewer_id).name,

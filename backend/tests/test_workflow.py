@@ -116,10 +116,23 @@ def test_real_signal_analysis_review_and_export(client, headers):
         ).status_code
         == 403
     )
+    url = f"/api/v1/analyses/{result['id']}"
+    reviewer = headers("reviewer")
+    returned = client.post(url + "/reviews", headers=reviewer, json=dict(conclusion="returned", comment="Please clarify input source"))
+    assert returned.status_code == 200
+    event = returned.json()["result"]["review_history"][0]["id"]
+    assert client.get(f"/api/v1/studies/{study}", headers=auth).json()["result"]["status"] == "pending_correction"
+    supplement = dict(previous_event_id=event, comment="Confirmed original input source")
+    assert client.post(url + "/resubmit", headers=reviewer, json=supplement).status_code == 403
+    resubmitted = client.post(url + "/resubmit", headers=auth, json=supplement)
+    assert resubmitted.status_code == 200
+    assert client.post(url + "/resubmit", headers=auth, json=supplement).status_code == 409
+    assert client.post(url + "/reviews", headers=reviewer, json=dict(conclusion="confirmed", comment="stale approval")).status_code == 409
+    event = resubmitted.json()["result"]["review_history"][0]["id"]
     response = client.post(
         f"/api/v1/analyses/{result['id']}/reviews",
         headers=headers("reviewer"),
-        json=dict(conclusion="confirmed", comment="<script>alert(1)</script> reviewed"),
+        json=dict(previous_event_id=event, conclusion="confirmed", comment="<script>alert(1)</script> reviewed"),
     )
     assert response.status_code == 200, response.text
     assert (
@@ -149,8 +162,9 @@ def test_real_signal_analysis_review_and_export(client, headers):
             conclusion="needs_attention", comment="A second independent review record"
         ),
     )
-    assert response.status_code == 200
-    assert len(response.json()["result"]["review_history"]) == 2
+    assert response.status_code == 409
+    history = client.get(f"/api/v1/studies/{study}", headers=auth).json()["result"]["analyses"][0]["review_history"]
+    assert [event["conclusion"] for event in history] == ["confirmed", "resubmitted", "returned"]
 
 
 def test_image_onnx_parity(client, headers):

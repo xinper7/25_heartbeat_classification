@@ -47,8 +47,11 @@ def report_pdf(db,study,analysis):
  table([['类别','名称','模型分数','阈值','判定']]+[[r['code'],r['name'],f"{r['probability']*100:.2f}%",f"{r['threshold']:.2f}",'阳性' if r['positive'] else '阴性'] for r in analysis.predictions],[60,155,100,80,120])
  story.append(p('模型分数不等于患病概率；本结果为多标签辅助分析，不替代专业人员判断。'))
  section('专业复核')
- review=result['review']
- story.append(p(f"复核人员：{review['reviewer']}\n时间：{review['created_at']}\n结论：{review['conclusion']}\n意见：{review['comment']}" if review else '尚未复核。本报告包含未复核模型结果。'))
+ labels={'returned':'退回补充','resubmitted':'补充后重新送审','confirmed':'确认归档','needs_attention':'归档，需进一步关注'}
+ history=result['review_history']
+ if not history: story.append(p('尚未复核。本报告包含未复核模型结果。'))
+ for event in reversed(history):
+  story.append(p(f"{labels.get(event['conclusion'],event['conclusion'])} · {event['reviewer']} · {event['created_at']}\n{event['comment']}"))
  section('模型与处理信息')
  story.append(p(f'模型：{analysis.model_version}\n预处理：{analysis.preprocessing_version}\n推理耗时：{analysis.timings.get("inference_ms",0):.2f} ms\n模型 SHA-256：{analysis.provenance.get("model_sha256","未记录")}','SmallCN'))
  story.append(PageBreak());section('原始输入与数据来源')

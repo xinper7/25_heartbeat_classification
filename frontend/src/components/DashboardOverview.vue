@@ -365,6 +365,7 @@ const statusNames: Record<string, string> = {
   ready: "已校验",
   queued: "已排队",
   processing: "分析中",
+  pending_correction: "待补充",
   awaiting_review: "待复核",
   archived: "已归档",
   failed: "失败",

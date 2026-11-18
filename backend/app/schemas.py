@@ -47,9 +47,13 @@ class StudyIn(BaseModel):
     note: str = Field(default="", max_length=2000)
 
 
-class ReviewIn(BaseModel):
-    conclusion: Literal["confirmed", "needs_attention"]
+class ReviewAction(BaseModel):
+    previous_event_id: int | None = None
     comment: str = Field(min_length=5, max_length=5000)
+
+
+class ReviewIn(ReviewAction):
+    conclusion: Literal["confirmed", "needs_attention", "returned"]
 
 
 class JobIn(BaseModel):

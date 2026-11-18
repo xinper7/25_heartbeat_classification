@@ -473,10 +473,10 @@
                     <span
                       :class="[
                         'status',
-                        latestAnalysis.review ? 'archived' : 'awaiting_review',
+                        activeStudy?.status,
                       ]"
                       >{{
-                        latestAnalysis.review ? "已复核" : "待专业复核"
+                        statusNames[activeStudy?.status]
                       }}</span
                     ><span
                       >纯推理
@@ -525,7 +525,7 @@
                       ><el-icon><Download /></el-icon> 导出报告</el-button
                     ><el-button
                       class="action-review"
-                      v-if="canReview"
+                      v-if="canReview && activeStudy?.status === 'awaiting_review'"
                       @click="showReview(latestAnalysis)"
                       >填写复核意见</el-button
                     ><el-button text @click="openStudy(activeStudy.id)"
@@ -1210,7 +1210,7 @@
           </p>
           <div v-if="a.review" class="review-note">
             <strong
-              >复核意见 · {{ a.review.reviewer }} ·
+              >{{ reviewLabels[a.review.conclusion] }} · {{ a.review.reviewer }} ·
               {{ date(a.review.created_at) }}</strong
             >
             <p>{{ a.review.comment }}</p>
@@ -1229,22 +1229,23 @@
                 :key="i"
                 class="review-note"
               >
-                <strong>{{ r.reviewer }} · {{ date(r.created_at) }}</strong>
+                <strong>{{ reviewLabels[r.conclusion] }} · {{ r.reviewer }} · {{ date(r.created_at) }}</strong>
                 <p>{{ r.comment }}</p>
               </div>
             </el-collapse-item>
           </el-collapse>
           <div class="result-actions">
+            <el-button v-if="canAnalyze && detail.status === 'pending_correction' && a.id === detail.analyses[0].id" @click="resubmitStudy(a)">补充说明并重新送审</el-button>
             <el-button class="action-export" @click="downloadReport(a.id)"
               >导出 PDF 报告</el-button
             >
             <el-button
               class="action-review"
-              v-if="canReview && a.id === detail.analyses[0].id"
+              v-if="canReview && detail.status === 'awaiting_review' && a.id === detail.analyses[0].id"
               type="primary"
               plain
               @click="showReview(a)"
-              >{{ a.review ? "补充复核意见" : "填写复核意见" }}</el-button
+              >填写复核意见</el-button
             >
           </div>
         </section>
@@ -1261,6 +1262,7 @@
             ><el-radio value="confirmed">已复核</el-radio
             ><el-radio value="needs_attention"
               >已复核，需进一步关注</el-radio
+            ><el-radio value="returned">退回补充</el-radio
             ></el-radio-group
           ></el-form-item
         ><el-form-item label="复核意见"
@@ -1279,8 +1281,8 @@
           @click="saveReview(false)"
           :loading="busy"
           data-testid="review-submit"
-          >保存并归档</el-button
-        ><el-button v-if="detail && (reviewNeighbors.next || reviewNeighbors.previous)" @click="saveReview(true)" :loading="busy">归档并继续复核</el-button></template
+          >{{ reviewForm.conclusion === "returned" ? "退回补充" : "保存并归档" }}</el-button
+        ><el-button v-if="detail && (reviewNeighbors.next || reviewNeighbors.previous)" @click="saveReview(true)" :loading="busy">保存并继续复核</el-button></template
       ></el-dialog
     >
     <el-dialog v-model="userDialog" title="新建专业人员账号" width="480px"
@@ -1408,12 +1410,14 @@ const sexNames: Record<string, string> = {
   female: "女",
   unknown: "未记录",
 };
+const reviewLabels: Record<string,string> = {confirmed:"确认归档", needs_attention:"归档，需进一步关注", returned:"退回补充", resubmitted:"已补充，重新送审"};
 const statusNames: Record<string, string> = {
   awaiting_upload: "待上传",
   ready: "已校验",
   queued: "排队中",
   processing: "分析中",
   awaiting_review: "待复核",
+  pending_correction: "待补充",
   archived: "已归档",
   failed: "分析失败",
 };
@@ -1967,7 +1971,24 @@ async function analyzeDetail() {
     analyzing.value = false;
   }
 }
+async function resubmitStudy(a: any) {
+  let comment: string;
+  try {
+    const input = await ElMessageBox.prompt("填写已补充的信息。如需更换原始文件，请新建检查并重新分析。", "重新送审", {
+      inputType: "textarea", inputValidator: (v: string) => (v?.trim().length >= 5 && v.trim().length <= 5000) || "请输入5至5000个字符",
+    });
+    comment = input.value.trim();
+  } catch { return; }
+  await guarded(async () => {
+    await post(`/analyses/${a.id}/resubmit`, {comment, previous_event_id: a.review_history[0].id});
+    await openStudy(a.study_id);
+    await loadPage();
+    ElMessage.success("已重新送审");
+  });
+}
+const previousReviewEvent = ref<number|null>(null);
 function showReview(a: any) {
+  previousReviewEvent.value = a.review_history?.[0]?.id ?? null;
   reviewId.value = a.id;
   reviewForm.comment = "";
   reviewForm.conclusion = "confirmed";
@@ -1980,12 +2001,15 @@ async function saveReview(continueNext = false) {
   }
   await guarded(async () => {
     const nextId = reviewNeighbors.value.next || reviewNeighbors.value.previous;
-    const a = await post(`/analyses/${reviewId.value}/reviews`, reviewForm);
+    const a = await post(`/analyses/${reviewId.value}/reviews`, {...reviewForm, previous_event_id: previousReviewEvent.value});
     reviewDialog.value = false;
-    if (latestAnalysis.value?.id === a.id) latestAnalysis.value = a;
+    if (latestAnalysis.value?.id === a.id) {
+      latestAnalysis.value = a;
+      activeStudy.value.status = reviewForm.conclusion === "returned" ? "pending_correction" : "archived";
+    }
     if (detail.value) await openStudy(detail.value.id);
     await loadPage();
-    ElMessage.success("复核意见已保存并归档");
+    ElMessage.success(reviewForm.conclusion === "returned" ? "已退回补充" : "复核意见已保存并归档");
     if(continueNext && nextId) await openStudy(nextId);
   });
 }
